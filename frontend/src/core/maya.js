@@ -88,6 +88,15 @@ export class Maya {
       }
     });
 
+    // The lamp's send light — a second, visible path to the same genie.
+    const sendBtn = document.getElementById("maya-send");
+    if (sendBtn) {
+      sendBtn.addEventListener("click", () => {
+        const text = this.inputEl.value.trim();
+        if (text) this._captureAndSend(text);
+      });
+    }
+
     this.chooserEl.querySelector(".chooser-type").addEventListener("click", () => this._onChooseBtn("type"));
     this.chooserEl.querySelector(".chooser-speak").addEventListener("click", () => this._onChooseBtn("speak"));
     this.voiceEl.querySelector(".voice-btn").addEventListener("click", () => {
