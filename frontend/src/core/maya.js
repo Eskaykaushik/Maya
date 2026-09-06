@@ -447,7 +447,10 @@ export class Maya {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
-          history: this.store.get().conversation.slice(-8),
+          history: this.store.get().conversation.slice(-8).map((turn) => ({
+            role: turn.role,
+            content: turn.text,
+          })),
           session_id: snapshot.session_id,
           ui_state: snapshot.ui_state,
         }),
