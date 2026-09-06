@@ -32,10 +32,10 @@ Maya is a dark, ephemeral, conversation-first AI agent. Tools materialize out of
 
 1. ~~**Re-run full frontend verification** after the random/filemaker/worldclock pattern fixes — all 7 tools must materialize (tier-1).~~ **Done** — all 7 tools materialize at distinct positions, zero console/HTTP errors. **Found & fixed:** worldclock offset bug (`worldclock.js`) was rendering the offset in minutes (`-240h`) instead of hours — now `-4.0h` (NY) / `+1.0h` (London) / `+5.5h` (Mumbai) etc., via a TZ-independent `getOffset`.
 2. **Push + deploy** (user approved "Push + deploy for me"):
-   - Maya repo: verify/init git → commit frontend + readme + workflow → push to GitHub (`main`) → Pages workflow deploys `frontend/`.
-   - kaushix-api repo: commit `agents/maya.py` → push to `github` remote (`git@github.com:Eskaykaushik/Kaushix-api-service.git`) → Render redeploys `/api/maya`.
-3. **Fill `frontend/src/config.js` `apiUrl`** with the kaushix-api Render URL (currently `""` placeholder) so tier-2 routing works in production. Maya is fully standalone without it.
-4. **Final browser cross-check** of the deployed GitHub Pages site (all 7 tools + dissolve + magical placement).
+   - Maya repo: verify/init git → commit frontend + readme + workflow → push to GitHub (`main`) → Pages workflow deploys `frontend/`. ~~**Done**~~ — committed `983ea00` (Phase-1 spec core, worldclock offset fix, favicon), pushed to `main`; Pages run `34062915794` succeeded. Live at https://eskaykaushik.github.io/Maya/.
+   - kaushix-api repo: commit `agents/maya.py` → push to `github` remote (`git@github.com:Eskaykaushik/Kaushix-api-service.git`) → Render redeploys `/api/maya`. **Already done** — `agents/maya.py` committed at `63beae6`; `main` is in sync with `github/main` (0/0 ahead/behind). Nothing to push.
+3. **Fill `frontend/src/config.js` `apiUrl`** with the kaushix-api Render URL (currently `""` placeholder) so tier-2 routing works in production. Maya is fully standalone without it. **Already filled** — `https://kaushix-api-service.onrender.com` at `frontend/src/config.js:8`; item is stale.
+4. **Final browser cross-check** of the deployed GitHub Pages site (all 7 tools + dissolve + magical placement). **Done** — all 7 tools materialize at distinct positions on the live site, worldclock `-4.0h`, zero console/HTTP errors; `?spec=demo&auto=1` renders the ghost UI + diff.
 5. ~~Optional later: add a favicon to silence the 404 console error.~~ **Done** — added `frontend/favicon.svg` + link in `frontend/index.html`.
 
 ## Blocked / Notes
