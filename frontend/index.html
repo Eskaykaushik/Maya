@@ -14,7 +14,7 @@
 
   <div id="maya-prompt" class="maya-prompt">
     <p class="maya-prompt-text">Hi, I am Maya</p>
-    <p class="maya-prompt-hint">ask for anything · speak or type below</p>
+    <p class="maya-prompt-hint">tap the dark to begin</p>
   </div>
 
   <div id="maya-transcript" class="maya-transcript"></div>
@@ -23,6 +23,29 @@
          placeholder="ask for anything…" aria-label="Type a request" />
 
   <div id="maya-file" class="maya-file" hidden></div>
+
+  <div id="maya-line" class="maya-line" hidden></div>
+
+  <div id="maya-chooser" class="maya-chooser" hidden>
+    <button class="chooser-btn chooser-type" type="button" aria-label="Type a request">
+      <span class="chooser-glyph">Aa</span>
+      <span class="chooser-label">type</span>
+    </button>
+    <button class="chooser-btn chooser-speak" type="button" aria-label="Speak a request">
+      <span class="chooser-glyph"><span class="speak-dot"></span></span>
+      <span class="chooser-label">speak</span>
+    </button>
+  </div>
+
+  <div id="maya-voice" class="maya-voice" hidden>
+    <button class="voice-btn" type="button" aria-label="Talk to Maya">
+      <span class="voice-ring voice-ring-1"></span>
+      <span class="voice-ring voice-ring-2"></span>
+      <span class="voice-ring voice-ring-3"></span>
+      <span class="voice-core"></span>
+    </button>
+    <p class="voice-hint">listening…</p>
+  </div>
 
   <footer class="site-footer">
     <p>Maya — everything you need, when you need it.</p>

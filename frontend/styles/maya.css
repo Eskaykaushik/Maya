@@ -346,6 +346,265 @@ body {
 
 .maya-input.is-visible {
   opacity: 1;
+  animation: maya-input-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The input expands out of a drawn hairline. */
+@keyframes maya-input-rise {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(0.2) translateY(10px);
+    filter: blur(8px);
+  }
+  60% { opacity: 1; filter: blur(0); }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Hairline — draws from the tap point to the input before it materializes.
+--------------------------------------------------------------------------- */
+.maya-line {
+  position: fixed;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(150,165,255,0.85) 50%, rgba(255,255,255,0) 100%);
+  box-shadow: 0 0 12px rgba(120, 140, 255, 0.55);
+  z-index: 4;
+  pointer-events: none;
+  transform: scaleX(0);
+}
+
+.maya-line.is-drawn {
+  animation: maya-line-draw 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes maya-line-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ---------------------------------------------------------------------------
+   Chooser — the Type / Speak orbs, summoned out of the dark at the tap point.
+--------------------------------------------------------------------------- */
+.maya-chooser {
+  position: fixed;
+  z-index: 6;
+  display: flex;
+  gap: 72px;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.maya-chooser.is-visible {
+  pointer-events: auto;
+}
+
+.chooser-btn {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 1px solid var(--maya-hairline);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(120, 140, 255, 0.16), rgba(0, 0, 0, 0) 62%),
+    rgba(255, 255, 255, 0.02);
+  color: var(--maya-fg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-shadow:
+    0 0 34px rgba(120, 140, 255, 0.12),
+    inset 0 0 26px rgba(120, 140, 255, 0.06);
+  animation: maya-emerge 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.2s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.chooser-btn + .chooser-btn {
+  animation-delay: 0.12s;
+}
+
+.chooser-btn:hover {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 46px rgba(120, 140, 255, 0.2),
+    inset 0 0 28px rgba(120, 140, 255, 0.09);
+}
+
+.chooser-btn:active {
+  transform: scale(0.94);
+}
+
+.chooser-glyph {
+  font-family: var(--maya-mono);
+  font-size: 36px;
+  font-weight: 200;
+  color: rgba(205, 212, 255, 0.92);
+  text-shadow: 0 0 18px rgba(120, 140, 255, 0.45);
+  line-height: 1;
+}
+
+.chooser-label {
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--maya-dim);
+}
+
+/* The speak orb warms up — voice is the hot channel. */
+.chooser-speak {
+  border-color: rgba(255, 160, 90, 0.2);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 160, 90, 0.16), rgba(0, 0, 0, 0) 62%),
+    rgba(255, 255, 255, 0.02);
+  box-shadow:
+    0 0 34px rgba(255, 160, 90, 0.12),
+    inset 0 0 26px rgba(255, 160, 90, 0.06);
+}
+
+.chooser-speak:hover {
+  border-color: rgba(255, 170, 105, 0.34);
+  box-shadow:
+    0 0 46px rgba(255, 160, 90, 0.2),
+    inset 0 0 28px rgba(255, 160, 90, 0.09);
+}
+
+.chooser-speak .chooser-glyph {
+  color: rgba(255, 195, 140, 0.95);
+  text-shadow: 0 0 18px rgba(255, 160, 90, 0.5);
+}
+
+/* Radar dot inside the speak orb — the attention rings never stop orbiting. */
+.speak-dot {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 195, 140, 0.9);
+  box-shadow: 0 0 18px rgba(255, 160, 90, 0.7);
+}
+
+.speak-dot::before,
+.speak-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 160, 90, 0.5);
+  animation: maya-radar 2s ease-out infinite;
+}
+
+.speak-dot::after {
+  animation-delay: 1s;
+}
+
+@keyframes maya-radar {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+.maya-chooser.is-dissolving {
+  pointer-events: none;
+}
+
+.maya-chooser.is-dissolving .chooser-btn {
+  animation: maya-dissolve 0.34s ease-in both;
+}
+
+.maya-chooser.is-dissolving .chooser-btn + .chooser-btn {
+  animation-delay: 0.06s;
+}
+
+/* ---------------------------------------------------------------------------
+   Voice control — the listening orb, alive with your amplitude.
+--------------------------------------------------------------------------- */
+.maya-voice {
+  position: fixed;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.maya-voice.is-visible {
+  pointer-events: auto;
+}
+
+.maya-voice.is-dissolving {
+  pointer-events: none;
+}
+
+.maya-voice.is-dissolving .voice-btn {
+  animation: maya-dissolve 0.4s ease-in both;
+}
+
+.voice-btn {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 160, 90, 0.25);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 160, 90, 0.12), rgba(0, 0, 0, 0) 65%),
+    rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  animation: maya-emerge 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.15s ease;
+}
+
+.voice-btn:hover { transform: scale(1.05); }
+.voice-btn:active { transform: scale(0.94); }
+
+.voice-ring {
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 190, 130, 0.4);
+  animation: maya-ring 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.voice-ring-2 { animation-delay: 0.45s; }
+.voice-ring-3 { animation-delay: 0.9s; }
+
+@keyframes maya-ring {
+  0%   { transform: scale(0.55); opacity: 0.8; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+.voice-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: rgba(255, 200, 145, 0.92);
+  box-shadow: 0 0 22px rgba(255, 160, 90, 0.7);
+  transform: scale(calc(1 + var(--voi-amp, 0) * 1.4));
+  transition: transform 0.12s linear;
+  pointer-events: none;
+}
+
+.voice-hint {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(255, 160, 90, 0.65);
+  animation: maya-typeset 0.4s ease-out forwards;
 }
 
 /* ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ export class Audio {
     this.ctx = null;
     this.analyser = null;
     this.source = null;
+    this.stream = null;
     this.recognition = null;
     this.listening = false;
     this.speechActive = false;
@@ -35,9 +36,11 @@ export class Audio {
   }
 
   async start() {
+    if (this.ctx) return true;
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
+    this.stream = stream;
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 1024;
@@ -145,7 +148,15 @@ export class Audio {
 
   stop() {
     cancelAnimationFrame(this._raf);
-    if (this.source) { try { this.source.disconnect(); } catch {} }
-    if (this.ctx) { try { this.ctx.close(); } catch {} }
+    if (this.recognition) { try { this.recognition.stop(); } catch { /* noop */ } }
+    if (this.source) { try { this.source.disconnect(); } catch { /* noop */ } }
+    if (this.ctx) { try { this.ctx.close(); } catch { /* noop */ } }
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.ctx = null;
+    this.analyser = null;
+    this.source = null;
+    this.stream = null;
+    this.listening = false;
+    this.speechActive = false;
   }
 }

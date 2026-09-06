@@ -25,6 +25,7 @@ export class VoiceRenderer {
     this.focusX = 0;
     this.focusY = 0;
     this._raf = 0;
+    this.t = 0;
     this.feedIsRunning = false;
     this._resize();
     window.addEventListener("resize", () => this._resize());
@@ -54,14 +55,33 @@ export class VoiceRenderer {
   feed(amplitude) {
     const target =
       this.state === "speaking" ? Math.min(1, amplitude * 6)
-      : this.state === "listening" ? Math.min(0.35, amplitude * 8)
+      : (this.state === "listening" || this.state === "voice") ? Math.min(0.45, amplitude * 9)
       : this.state === "thinking" ? this.energy * 0.3
+      : this.state === "prompting" ? 0.16
       : 0;
     this.targetEnergy = target;
 
     if (!this.feedIsRunning) {
       this.feedIsRunning = true;
       requestAnimationFrame(() => { this._syncParticles(target); this.feedIsRunning = false; });
+    }
+  }
+
+  /** An instant sparkle of light at a point — the chooser announcing itself. */
+  burst(x, y) {
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = 24 + Math.random() * 90;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * d * 0.16,
+        vy: Math.sin(a) * d * 0.16 - 0.4,
+        life: 1,
+        decay: 0.5 + Math.random() * 0.45,
+        size: 0.8 + Math.random() * 1.7,
+      });
+      if (this.particles.length > 1200) this.particles.length = 1200;
     }
   }
 
@@ -93,6 +113,12 @@ export class VoiceRenderer {
 
   start() {
     const draw = () => {
+      this.t++;
+      // Without a mic (privacy-first), the chooser still holds a living halo.
+      if (this.state === "prompting") {
+        this.targetEnergy = 0.16 + Math.sin(this.t * 0.012) * 0.05;
+        this._syncParticles(this.targetEnergy);
+      }
       this.energy += (this.targetEnergy - this.energy) * 0.05;
       this._clear();
       this._drawParticles();

@@ -6,6 +6,8 @@ const maya = new Maya({
   promptEl: document.getElementById("maya-prompt"),
   transcriptEl: document.getElementById("maya-transcript"),
   inputEl: document.getElementById("maya-input"),
+  chooserEl: document.getElementById("maya-chooser"),
+  voiceEl: document.getElementById("maya-voice"),
 });
 
 window.__maya = maya;
