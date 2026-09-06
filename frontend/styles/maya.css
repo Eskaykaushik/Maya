@@ -91,7 +91,7 @@ body {
 .maya-transcript {
   position: fixed;
   left: 50%;
-  bottom: 15%;
+  bottom: 38%;
   transform: translateX(-50%);
   z-index: 2;
   font-size: clamp(16px, 3vw, 24px);
@@ -121,7 +121,7 @@ body {
 .maya-whisper {
   position: fixed;
   left: 50%;
-  bottom: 11%;
+  bottom: 22%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -505,19 +505,20 @@ body {
 .calc-key.eq:hover { background: rgba(90, 160, 255, 0.85); }
 
 /* ---------------------------------------------------------------------------
-   Input — a living lamp, born at the screen's centre, resting a bit below it.
+   Input — a living lamp, born at the screen's centre, then resting as the
+   quiet composer at the bottom. It persists once summoned.
 --------------------------------------------------------------------------- */
 .maya-input {
   position: fixed;
   left: 50%;
-  bottom: 18%;
+  bottom: 5%;
   transform: translateX(-50%);
   z-index: 4;
-  width: min(60vw, 440px);
+  width: min(84vw, 540px);
   background:
-    radial-gradient(120% 220% at 50% 0%, rgba(120, 140, 255, 0.08), rgba(255, 255, 255, 0.015) 55%, rgba(0, 0, 0, 0) 100%),
-    rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(150, 165, 255, 0.2);
+    radial-gradient(120% 220% at 50% 0%, rgba(120, 140, 255, 0.06), rgba(255, 255, 255, 0.008) 55%, rgba(0, 0, 0, 0) 100%),
+    rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(150, 165, 255, 0.16);
   border-radius: 999px;
   padding: 15px 26px;
   color: rgba(240, 243, 255, 0.95);
@@ -528,8 +529,8 @@ body {
   opacity: 0;
   caret-color: rgba(170, 185, 255, 0.95);
   box-shadow:
-    0 0 26px rgba(120, 140, 255, 0.08),
-    inset 0 0 22px rgba(120, 140, 255, 0.05);
+    0 0 18px rgba(120, 140, 255, 0.06),
+    inset 0 0 14px rgba(120, 140, 255, 0.035);
   transition: opacity 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -548,11 +549,11 @@ body {
 }
 
 .maya-input:focus {
-  border-color: rgba(180, 195, 255, 0.45);
+  border-color: rgba(180, 195, 255, 0.4);
   box-shadow:
-    0 0 38px rgba(120, 140, 255, 0.2),
-    0 0 6px rgba(150, 165, 255, 0.25),
-    inset 0 0 26px rgba(120, 140, 255, 0.1);
+    0 0 26px rgba(120, 140, 255, 0.16),
+    0 0 4px rgba(150, 165, 255, 0.2),
+    inset 0 0 18px rgba(120, 140, 255, 0.08);
   animation-play-state: paused;
 }
 
@@ -567,12 +568,12 @@ body {
 
 @keyframes maya-vessel-breathe {
   0%, 100% {
-    border-color: rgba(150, 165, 255, 0.18);
-    box-shadow: 0 0 22px rgba(120, 140, 255, 0.06), inset 0 0 18px rgba(120, 140, 255, 0.04);
+    border-color: rgba(150, 165, 255, 0.14);
+    box-shadow: 0 0 14px rgba(120, 140, 255, 0.04), inset 0 0 12px rgba(120, 140, 255, 0.025);
   }
   50% {
-    border-color: rgba(170, 185, 255, 0.32);
-    box-shadow: 0 0 34px rgba(120, 140, 255, 0.13), inset 0 0 26px rgba(120, 140, 255, 0.08);
+    border-color: rgba(170, 185, 255, 0.26);
+    box-shadow: 0 0 22px rgba(120, 140, 255, 0.09), inset 0 0 16px rgba(120, 140, 255, 0.05);
   }
 }
 

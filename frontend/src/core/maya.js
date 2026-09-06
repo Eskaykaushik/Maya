@@ -95,12 +95,19 @@ export class Maya {
         this._dismissChooser();
         return;
       }
+      // The composer is up — a tap on the dark folds it back into the calm.
+      if (this.state === "typing") {
+        this._dismissComposer();
+        return;
+      }
       if (this.state !== "dormant") return;
       this._openChooser();
     });
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && this.state === "prompting") this._dismissChooser();
+      if (e.key !== "Escape") return;
+      if (this.state === "prompting") this._dismissChooser();
+      else if (this.state === "typing") this._dismissComposer();
     });
   }
 
@@ -199,6 +206,20 @@ export class Maya {
     input.style.removeProperty("--lift");
   }
 
+  /** The resting state — the composer stays present once it has bloomed. */
+  _rest() {
+    this._enter(this.inputEl.classList.contains("is-visible") ? "typing" : "dormant");
+  }
+
+  /** Fold the composer back into the calm — Escape or a tap on the dark. */
+  _dismissComposer() {
+    if (!this.inputEl.classList.contains("is-visible")) return;
+    this.inputEl.value = "";
+    this._hideInput();
+    this.promptEl.classList.remove("is-hidden");
+    this._enter("dormant");
+  }
+
   /**
    * The genie send — the words narrow and are drawn into the lamp, then the
    * lamp releases them as light and Maya answers.
@@ -222,7 +243,7 @@ export class Maya {
     input.removeAttribute("disabled");
     input.value = "";
     this._capturing = false;
-    this._enter("dormant");
+    this._rest();
 
     // The lamp releases the words as light, then Maya materializes an answer.
     this.renderer.burst(cx, cy);
@@ -312,7 +333,6 @@ export class Maya {
   async _handleText(text) {
     if (!text) return;
     this._showTranscript(text);
-    this._hideInput();
 
     if (this.state === "voice" || this.state === "speaking" || this.state === "thinking") {
       this._dismissVoice();
@@ -334,7 +354,7 @@ export class Maya {
       const reply = intent.reply || "There.";
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._enter("dormant"), 1400);
+      setTimeout(() => this._rest(), 1400);
       return;
     }
 
@@ -342,7 +362,7 @@ export class Maya {
       const reply = intent?.reply || "I did not quite catch that. Try again?";
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._enter("dormant"), 1400);
+      setTimeout(() => this._rest(), 1400);
       return;
     }
 
@@ -360,7 +380,7 @@ export class Maya {
       el.addEventListener("maya:complete", () => {
         this.materializer.dismiss();
         if (this._lastToolRune) this._lastToolRune.classList.add("is-faded");
-        this._enter("dormant");
+        this._rest();
       });
 
       this.materializer.mount(el);
@@ -370,7 +390,7 @@ export class Maya {
       const reply = `I don't know how to reveal "${intent.experience}" yet.`;
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._enter("dormant"), 1400);
+      setTimeout(() => this._rest(), 1400);
     }
   }
 
