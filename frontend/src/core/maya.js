@@ -38,11 +38,13 @@ const RENDER_STATES = {
 };
 
 export class Maya {
-  constructor({ canvas, stage, promptEl, transcriptEl, inputEl, chooserEl, voiceEl }) {
+  constructor({ canvas, stage, promptEl, transcriptEl, whisperEl, chatEl, inputEl, chooserEl, voiceEl }) {
     this.canvas = canvas;
     this.stage = stage;
     this.promptEl = promptEl;
     this.transcriptEl = transcriptEl;
+    this.whisperEl = whisperEl;
+    this.chatEl = chatEl;
     this.inputEl = inputEl;
     this.chooserEl = chooserEl;
     this.voiceEl = voiceEl;
@@ -54,6 +56,7 @@ export class Maya {
     this.sfx = new Sfx();
     this._chooserPoint = null;
     this._capturing = false;
+    this._lastToolRune = null;
 
     this._bindUI();
   }
@@ -80,17 +83,20 @@ export class Maya {
       this._dismissVoice();
     });
 
-    // Tap the dark → summon the Type / Speak chooser at the touch point.
+    // The thread's collapse dot — shrink or restore the conversation.
+    this.chatEl.querySelector(".chat-collapse").addEventListener("click", () => this._toggleChatCollapse());
+
+    // Tap the dark → summon the Type / Speak chooser at the screen's centre.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, .chooser-btn, .maya-voice, .site-footer, #maya-file")) return;
+      if (t && t.closest(".maya-tool, .maya-input, .chooser-btn, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
       if (this.materializer.active) return;
       if (this.state === "prompting") {
         this._dismissChooser();
         return;
       }
       if (this.state !== "dormant") return;
-      this._openChooser(e.clientX, e.clientY);
+      this._openChooser();
     });
 
     document.addEventListener("keydown", (e) => {
@@ -102,9 +108,11 @@ export class Maya {
    *  The chooser — Type / Speak, unfurling out of a point of light.
    * ------------------------------------------------------------------ */
 
-  _openChooser(x, y) {
+  _openChooser() {
     this.promptEl.classList.add("is-hidden");
-    const pt = this._clampPoint(x, y - 84); // float above the finger
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const pt = { x: cx, y: cy };
     this._chooserPoint = pt;
 
     const c = this.chooserEl;
@@ -120,15 +128,6 @@ export class Maya {
     this.renderer.burst(pt.x, pt.y);
     this.sfx.reveal();
     this._enter("prompting");
-  }
-
-  _clampPoint(x, y) {
-    const m = 96;
-    const my = 168; // the vertical constellation needs room above and below
-    return {
-      x: Math.min(Math.max(m, x), window.innerWidth - m),
-      y: Math.min(Math.max(my, y), window.innerHeight - my),
-    };
   }
 
   _dismissChooser(opts = {}) {
@@ -151,14 +150,13 @@ export class Maya {
   }
 
   _onChooseBtn(mode) {
-    const pt = this._chooserPoint || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     this.sfx.choose();
     this._dismissChooser({ sound: false });
     if (mode === "type") {
       // The orbs dissolve into the point the box is born from.
       setTimeout(() => this._revealInput(), 240);
     } else {
-      setTimeout(() => this._openVoice(pt.x, pt.y), 320);
+      setTimeout(() => this._openVoice(), 320);
     }
   }
 
@@ -236,8 +234,8 @@ export class Maya {
    *  and silence ends the turn.
    * ------------------------------------------------------------------ */
 
-  async _openVoice(x, y) {
-    const pt = this._clampPoint(x, y - 24);
+  async _openVoice() {
+    const pt = this._chooserPoint || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const v = this.voiceEl;
     v.classList.remove("is-dissolving");
     v.hidden = false;
@@ -307,6 +305,8 @@ export class Maya {
     this.state = state;
     if (this.renderer) this.renderer.setState(RENDER_STATES[state] || state);
     if (this.audio) this.audio.setSpeaking(state === "thinking" || state === "materialized");
+    // The thinking whisper breathes only while Maya is working.
+    if (this.whisperEl) this.whisperEl.hidden = state !== "thinking";
   }
 
   async _handleText(text) {
@@ -331,13 +331,17 @@ export class Maya {
 
     // The backend answered without summoning a tool — show its words.
     if (intent && intent._spoke) {
-      if (intent.reply) this._say(intent.reply);
+      const reply = intent.reply || "There.";
+      this._say(reply);
+      this._commitTurn(text, reply);
       setTimeout(() => this._enter("dormant"), 1400);
       return;
     }
 
     if (!intent || !intent.experience) {
-      this._say(intent?.reply || "I did not quite catch that. Try again?");
+      const reply = intent?.reply || "I did not quite catch that. Try again?";
+      this._say(reply);
+      this._commitTurn(text, reply);
       setTimeout(() => this._enter("dormant"), 1400);
       return;
     }
@@ -352,16 +356,20 @@ export class Maya {
         setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
       });
 
-      // When the tool finishes, dissolve and return to dormancy.
+      // When the tool finishes, dissolve and return to dormancy — its rune fades last.
       el.addEventListener("maya:complete", () => {
         this.materializer.dismiss();
+        if (this._lastToolRune) this._lastToolRune.classList.add("is-faded");
         this._enter("dormant");
       });
 
       this.materializer.mount(el);
       this._say(intent.reply || "");
+      this._commitTurn(text, intent.reply || "On it.", intent.experience);
     } else {
-      this._say(`I don't know how to reveal "${intent.experience}" yet.`);
+      const reply = `I don't know how to reveal "${intent.experience}" yet.`;
+      this._say(reply);
+      this._commitTurn(text, reply);
       setTimeout(() => this._enter("dormant"), 1400);
     }
   }
@@ -406,6 +414,79 @@ export class Maya {
     el.textContent = text;
     el.classList.remove("is-dissolving");
     setTimeout(() => el.classList.add("is-dissolving"), 2600);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  The thread — each turn's words fly from the centre into a small,
+   *  quiet conversation at the top-left; old lines sink into memory.
+   * ------------------------------------------------------------------ */
+
+  _commitTurn(userText, replyText, tool) {
+    this._appendToChat(userText, { role: "user" });
+    setTimeout(() => this._appendToChat(replyText, { role: "maya", tool }), 90);
+  }
+
+  _appendToChat(text, { role, tool } = {}) {
+    if (!text || !text.trim()) return;
+    const entry = document.createElement("p");
+    entry.className = `chat-entry entry-${role}`;
+    if (tool) {
+      const rune = document.createElement("span");
+      rune.className = "chat-tool";
+      rune.textContent = `⧖ ${tool}`;
+      entry.append(document.createTextNode(text), rune);
+      this._lastToolRune = rune;
+    } else {
+      entry.textContent = text;
+    }
+    this._flyInto(entry);
+    this._settleThread();
+  }
+
+  _flyInto(entry) {
+    this.chatEl.appendChild(entry);
+    const target = entry.getBoundingClientRect();
+    const origin = this.transcriptEl && !this.transcriptEl.classList.contains("is-dissolving")
+      ? this.transcriptEl.getBoundingClientRect()
+      : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+    const ox = origin.left + (origin.width || 0) / 2;
+    const oy = origin.top + (origin.height || 0) / 2;
+    const x = Math.round(ox - (target.left + target.width / 2));
+    const y = Math.round(oy - (target.top + target.height / 2));
+    entry.style.setProperty("--flyx", `${x}px`);
+    entry.style.setProperty("--flyy", `${y}px`);
+    entry.classList.add("is-flying");
+    this.sfx.chime();
+    const land = entry.getBoundingClientRect();
+    setTimeout(() => {
+      entry.classList.remove("is-flying");
+      entry.style.removeProperty("--flyx");
+      entry.style.removeProperty("--flyy");
+      this.renderer.burst(land.left + land.width / 2, land.top + land.height / 2);
+    }, 760);
+  }
+
+  _settleThread() {
+    const chat = this.chatEl;
+    const entries = Array.from(chat.querySelectorAll(".chat-entry"));
+    while (entries.length > 20) entries.shift().remove();
+    entries.forEach((el, i) => el.classList.toggle("is-dim", i < entries.length - 3));
+    chat.classList.add("has-thread");
+    const spine = chat.querySelector(".chat-spine");
+    if (spine) spine.style.height = `${chat.classList.contains("is-collapsed") ? 0 : chat.scrollHeight}px`;
+    const collapse = chat.querySelector(".chat-collapse");
+    if (collapse && collapse.hidden) {
+      collapse.hidden = false;
+      collapse.setAttribute("aria-expanded", String(!chat.classList.contains("is-collapsed")));
+    }
+  }
+
+  _toggleChatCollapse() {
+    const chat = this.chatEl;
+    const collapsed = chat.classList.toggle("is-collapsed");
+    const collapse = chat.querySelector(".chat-collapse");
+    if (collapse) collapse.setAttribute("aria-expanded", String(!collapsed));
+    this._settleThread();
   }
 
   dispose() {

@@ -64,6 +64,12 @@ export class Sfx {
     this._tone(140, 180, 0.2, 0.05, "triangle");
   }
 
+  /** A line landing in the thread — tiny glass chime. */
+  chime() {
+    this._tone(840, 1240, 0.18, 0.03, "sine");
+    this._tone(1320, 1860, 0.22, 0.018, "sine", 0.07);
+  }
+
   /** Back into the dark. */
   dismiss() {
     this._tone(200, 110, 0.18, 0.04, "sine");

@@ -5,6 +5,8 @@ const maya = new Maya({
   stage: document.getElementById("maya-stage"),
   promptEl: document.getElementById("maya-prompt"),
   transcriptEl: document.getElementById("maya-transcript"),
+  whisperEl: document.getElementById("maya-whisper"),
+  chatEl: document.getElementById("maya-chat"),
   inputEl: document.getElementById("maya-input"),
   chooserEl: document.getElementById("maya-chooser"),
   voiceEl: document.getElementById("maya-voice"),
