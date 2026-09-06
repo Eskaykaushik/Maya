@@ -115,6 +115,15 @@ body {
   animation: maya-dissolve 0.5s ease-in forwards;
 }
 
+/* The last response persists — arriving bright, then resting calm & dim. */
+.maya-transcript.is-quiet {
+  animation: none;
+  opacity: 0.62;
+  text-shadow: 0 0 18px rgba(120, 140, 255, 0.18);
+  filter: saturate(0.85);
+  transition: opacity 1.6s ease, text-shadow 1.6s ease, filter 1.6s ease;
+}
+
 /* ---------------------------------------------------------------------------
    Thinking whisper — a soft amber breath where the answer will settle.
 --------------------------------------------------------------------------- */

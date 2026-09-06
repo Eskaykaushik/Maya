@@ -421,19 +421,19 @@ export class Maya {
   _showTranscript(text) {
     const el = this.transcriptEl;
     el.textContent = text;
-    el.classList.remove("is-dissolving");
+    el.classList.remove("is-dissolving", "is-quiet");
     el.style.animation = "none";
     void el.offsetWidth;
     el.style.animation = "";
-    setTimeout(() => el.classList.add("is-dissolving"), 1800);
   }
 
   _say(text) {
     if (!text) return;
     const el = this.transcriptEl;
     el.textContent = text;
-    el.classList.remove("is-dissolving");
-    setTimeout(() => el.classList.add("is-dissolving"), 2600);
+    el.classList.remove("is-dissolving", "is-quiet");
+    // The reply arrives bright, then settles into a calm & dim hold.
+    setTimeout(() => el.classList.add("is-quiet"), 2200);
   }
 
   /* ------------------------------------------------------------------ *
