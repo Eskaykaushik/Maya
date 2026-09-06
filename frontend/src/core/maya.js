@@ -154,44 +154,50 @@ export class Maya {
     this.sfx.choose();
     this._dismissChooser({ sound: false });
     if (mode === "type") {
-      // Orbs fold into the point; the hairline draws from there and the lamp rises.
-      setTimeout(() => this._revealInput(pt), 120);
+      // The orbs dissolve into the point the box is born from.
+      setTimeout(() => this._revealInput(), 120);
     } else {
       setTimeout(() => this._openVoice(pt.x, pt.y), 160);
     }
   }
 
   /* ------------------------------------------------------------------ *
-   *  Type — a hairline draws across the dark, and the input rises from it.
+   *  Type — a point of light blooms into the lamp at the screen's centre,
+   *  then the lamp glides down to rest. No keyboard steal.
    * ------------------------------------------------------------------ */
 
-  _revealInput(pt) {
-    this.inputEl.classList.add("is-visible");
-    if (pt) this._drawLineToInput(pt);
-    this.inputEl.focus({ preventScroll: true });
+  _revealInput() {
+    const input = this.inputEl;
+    input.classList.add("is-visible");
+
+    // Measure the resting box, then lift it to the screen centre for its birth.
+    const rect = input.getBoundingClientRect();
+    const restY = rect.top + rect.height / 2;
+    const lift = Math.max(0, restY - window.innerHeight / 2);
+    if (lift > 0) input.style.setProperty("--lift", `${lift}px`);
+
+    input.classList.remove("is-morphing");
+    void input.offsetWidth;
+    input.classList.add("is-morphing");
+    this.sfx.choose();
+
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    this.renderer.burst(cx, cy);
+
+    setTimeout(() => {
+      input.classList.remove("is-morphing");
+      input.style.removeProperty("--lift");
+    }, 950);
+
     this._enter("typing");
   }
 
-  _drawLineToInput(pt) {
-    const line = document.getElementById("maya-line");
-    const rect = this.inputEl.getBoundingClientRect();
-    if (!line || !rect.width) return;
-    const y0 = rect.top + rect.height / 2;
-    const x0 = pt.x;
-    const end = rect.left;
-    const d = Math.abs(end - x0);
-    line.hidden = false;
-    line.style.left = `${x0}px`;
-    line.style.top = `${y0}px`;
-    line.style.width = `${Math.max(1, d)}px`;
-    line.style.transformOrigin = x0 < end ? "left center" : "right center";
-    line.classList.remove("is-drawn");
-    void line.offsetWidth;
-    line.classList.add("is-drawn");
-    setTimeout(() => {
-      line.hidden = true;
-      line.classList.remove("is-drawn");
-    }, 700);
+  _hideInput() {
+    const input = this.inputEl;
+    input.classList.remove("is-visible");
+    input.classList.remove("is-morphing");
+    input.style.removeProperty("--lift");
   }
 
   /**
@@ -305,6 +311,7 @@ export class Maya {
   async _handleText(text) {
     if (!text) return;
     this._showTranscript(text);
+    this._hideInput();
 
     if (this.state === "voice" || this.state === "speaking" || this.state === "thinking") {
       this._dismissVoice();

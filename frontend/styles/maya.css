@@ -323,12 +323,12 @@ body {
 .calc-key.eq:hover { background: rgba(90, 160, 255, 0.85); }
 
 /* ---------------------------------------------------------------------------
-   Input — a living lamp that rises from a drawn hairline.
+   Input — a living lamp, born at the screen's centre, resting a bit below it.
 --------------------------------------------------------------------------- */
 .maya-input {
   position: fixed;
   left: 50%;
-  bottom: 5%;
+  bottom: 18%;
   transform: translateX(-50%);
   z-index: 4;
   width: min(60vw, 440px);
@@ -354,9 +354,15 @@ body {
 /* The lamp keeps a quiet light while it waits. */
 .maya-input.is-visible {
   opacity: 1;
+  animation: maya-vessel-breathe 4.5s ease-in-out infinite;
+}
+
+/* The birth journey: a point of light at the screen's centre blooms into the
+   lamp, then the lamp glides down (--lift: rest-to-centre, set by JS). */
+.maya-input.is-visible.is-morphing {
   animation:
-    maya-input-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1),
-    maya-vessel-breathe 4.5s ease-in-out 0.55s infinite;
+    maya-morph-in 0.85s cubic-bezier(0.16, 1, 0.3, 1) both,
+    maya-vessel-breathe 4.5s ease-in-out 0.9s infinite;
 }
 
 .maya-input:focus {
@@ -389,16 +395,24 @@ body {
 }
 
 /* The input expands out of a drawn hairline. */
-@keyframes maya-input-rise {
+@keyframes maya-morph-in {
   0% {
+    transform: translateX(-50%) translateY(calc(-1 * var(--lift, 0px))) scale(0.04);
     opacity: 0;
-    transform: translateX(-50%) scaleY(0.2) translateY(10px);
-    filter: blur(8px) brightness(2);
+    filter: blur(16px) brightness(2.4);
   }
-  60% { opacity: 1; filter: blur(0) brightness(1.25); }
-  100% {
+  30% {
+    transform: translateX(-50%) translateY(calc(-1 * var(--lift, 0px))) scale(1.02);
     opacity: 1;
-    transform: translateX(-50%) scaleY(1) translateY(0);
+    filter: blur(0) brightness(1.35);
+  }
+  48% {
+    transform: translateX(-50%) translateY(calc(-1 * var(--lift, 0px))) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
     filter: blur(0) brightness(1);
   }
 }
