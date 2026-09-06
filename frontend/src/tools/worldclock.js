@@ -53,15 +53,15 @@ Registry.implement("worldclock", () => {
       const opts = { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false };
       timeEl.textContent = now.toLocaleTimeString("en-GB", opts);
 
-      const raw = -now.getTimezoneOffset() + getOffset(now, tz);
-      const rounded = Math.round(raw * 2) / 2;
-      const sign = rounded >= 0 ? "+" : "";
-      offsetEl.textContent = `${sign}${rounded}h`;
+      const offset = getOffset(now, tz);
+      const sign = offset >= 0 ? "+" : "";
+      offsetEl.textContent = `${sign}${offset.toFixed(1)}h`;
     }
 
     function getOffset(date, timeZone) {
+      const utc = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
       const local = new Date(date.toLocaleString("en-US", { timeZone }));
-      return (local - date) / 60000;
+      return (local - utc) / 3600000;
     }
 
     tick();

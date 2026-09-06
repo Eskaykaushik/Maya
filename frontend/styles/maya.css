@@ -1235,6 +1235,275 @@ body {
   will-change: transform;
 }
 
+/* ---------------------------------------------------------------------------
+   Generated interfaces — ghost primitives (clean, less, aesthetic):
+   hairline borders, near-black fills, muted text, one accent per focal
+   artifact. Enforced visually here, structurally in ui/spec.js.
+--------------------------------------------------------------------------- */
+.ui-interface {
+  padding: 22px 24px;
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: min(76vw, 340px);
+  max-width: min(84vw, 560px);
+}
+
+.ui-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.34);
+  margin-bottom: 7px;
+}
+
+.ghost-text {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ghost-field {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--maya-hairline);
+  border-radius: 12px;
+  color: var(--maya-fg);
+  font-family: var(--maya-font);
+  font-size: 13.5px;
+  letter-spacing: 0.03em;
+  padding: 10px 14px;
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.ghost-field:focus {
+  outline: none;
+  border-color: rgba(120, 140, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ghost-select {
+  cursor: pointer;
+  appearance: none;
+}
+
+.ghost-select option {
+  background: #000;
+}
+
+.ghost-btn {
+  width: 100%;
+}
+
+.ghost-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ghost-range {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0;
+  accent-color: rgba(120, 140, 255, 0.9);
+}
+
+.ghost-value {
+  font-family: var(--maya-mono);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.62);
+  min-width: 34px;
+  text-align: right;
+}
+
+.ghost-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ghost-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--maya-hairline);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.ghost-toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.ghost-toggle.is-on {
+  border-color: rgba(120, 140, 255, 0.5);
+  background: rgba(120, 140, 255, 0.12);
+}
+
+.ghost-toggle.is-on::after {
+  transform: translateX(18px);
+  background: rgba(150, 165, 255, 0.9);
+}
+
+.ghost-toggle-label {
+  font-size: 13.5px;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ghost-metric {
+  font-family: var(--maya-mono);
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.ui-file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.ui-file-name {
+  font-size: 13.5px;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ui-file-status {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--maya-dim);
+}
+
+.ui-file.is-ready {
+  border-color: rgba(120, 200, 160, 0.35);
+}
+
+.ui-file.is-ready .ui-file-status {
+  color: rgba(160, 230, 190, 0.75);
+}
+
+.ui-diff {
+  border: 1px solid var(--maya-hairline);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px 16px;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+/* The focal artifact carries the interface's single accent light. */
+.ui-interface.has-diff .ui-diff.is-focal {
+  border-color: rgba(120, 140, 255, 0.35);
+  box-shadow: 0 0 28px rgba(120, 140, 255, 0.06);
+}
+
+.ui-diff-summary {
+  font-family: var(--maya-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 12px;
+}
+
+.ui-diff-lines {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-line {
+  display: flex;
+  gap: 10px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-family: var(--maya-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ui-mark {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--maya-dim);
+}
+
+.ui-line.is-del {
+  background: rgba(255, 120, 110, 0.06);
+  color: rgba(255, 160, 150, 0.8);
+}
+
+.ui-line.is-del .ui-mark {
+  color: rgba(255, 120, 110, 0.6);
+}
+
+.ui-line.is-ins {
+  background: rgba(120, 200, 160, 0.05);
+  color: rgba(170, 230, 200, 0.8);
+}
+
+.ui-line.is-ins .ui-mark {
+  color: rgba(120, 200, 160, 0.6);
+}
+
+.ui-line.is-same {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.ui-line-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ui-line.ui-more {
+  color: var(--maya-dim);
+  font-style: italic;
+}
+
+.maya-tool.is-error {
+  border: 1px solid rgba(255, 120, 110, 0.3);
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.ui-title {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 160, 150, 0.8);
+  margin-bottom: 8px;
+}
+
+.ui-error {
+  font-family: var(--maya-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 /* Accessibility */
 @media (prefers-reduced-motion: reduce) {
   * {
