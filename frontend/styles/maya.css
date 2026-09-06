@@ -16,6 +16,12 @@
   box-sizing: border-box;
 }
 
+/* Anything carrying the hidden attribute must not render — even overlays
+   that declare their own `display` (chooser/voice) must respect it. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   width: 100%;
@@ -317,7 +323,7 @@ body {
 .calc-key.eq:hover { background: rgba(90, 160, 255, 0.85); }
 
 /* ---------------------------------------------------------------------------
-   Input — appears only after Maya has handled a request.
+   Input — a living lamp that rises from a drawn hairline.
 --------------------------------------------------------------------------- */
 .maya-input {
   position: fixed;
@@ -325,28 +331,61 @@ body {
   bottom: 5%;
   transform: translateX(-50%);
   z-index: 4;
-  width: min(60vw, 420px);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--maya-hairline);
+  width: min(60vw, 440px);
+  background:
+    radial-gradient(120% 220% at 50% 0%, rgba(120, 140, 255, 0.08), rgba(255, 255, 255, 0.015) 55%, rgba(0, 0, 0, 0) 100%),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(150, 165, 255, 0.2);
   border-radius: 999px;
-  padding: 12px 22px;
-  color: var(--maya-fg);
+  padding: 15px 26px;
+  color: rgba(240, 243, 255, 0.95);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.02em;
   outline: none;
   opacity: 0;
+  caret-color: rgba(170, 185, 255, 0.95);
+  box-shadow:
+    0 0 26px rgba(120, 140, 255, 0.08),
+    inset 0 0 22px rgba(120, 140, 255, 0.05);
   transition: opacity 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.maya-input:focus {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 24px rgba(120, 140, 255, 0.08);
-}
-
+/* The lamp keeps a quiet light while it waits. */
 .maya-input.is-visible {
   opacity: 1;
-  animation: maya-input-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  animation:
+    maya-input-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    maya-vessel-breathe 4.5s ease-in-out 0.55s infinite;
+}
+
+.maya-input:focus {
+  border-color: rgba(180, 195, 255, 0.45);
+  box-shadow:
+    0 0 38px rgba(120, 140, 255, 0.2),
+    0 0 6px rgba(150, 165, 255, 0.25),
+    inset 0 0 26px rgba(120, 140, 255, 0.1);
+  animation-play-state: paused;
+}
+
+.maya-input::placeholder {
+  color: rgba(150, 158, 190, 0.55);
+  letter-spacing: 0.06em;
+}
+
+.maya-input:focus::placeholder {
+  color: rgba(185, 195, 230, 0.75);
+}
+
+@keyframes maya-vessel-breathe {
+  0%, 100% {
+    border-color: rgba(150, 165, 255, 0.18);
+    box-shadow: 0 0 22px rgba(120, 140, 255, 0.06), inset 0 0 18px rgba(120, 140, 255, 0.04);
+  }
+  50% {
+    border-color: rgba(170, 185, 255, 0.32);
+    box-shadow: 0 0 34px rgba(120, 140, 255, 0.13), inset 0 0 26px rgba(120, 140, 255, 0.08);
+  }
 }
 
 /* The input expands out of a drawn hairline. */
@@ -354,13 +393,52 @@ body {
   0% {
     opacity: 0;
     transform: translateX(-50%) scaleY(0.2) translateY(10px);
-    filter: blur(8px);
+    filter: blur(8px) brightness(2);
   }
-  60% { opacity: 1; filter: blur(0); }
+  60% { opacity: 1; filter: blur(0) brightness(1.25); }
   100% {
     opacity: 1;
     transform: translateX(-50%) scaleY(1) translateY(0);
-    filter: blur(0);
+    filter: blur(0) brightness(1);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Genie capture — the words narrow and are drawn into the lamp.
+--------------------------------------------------------------------------- */
+.maya-input.is-capturing {
+  animation: maya-lamp-capture 0.55s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes maya-lamp-capture {
+  0% {
+    transform: translateX(-50%);
+    letter-spacing: 0.02em;
+    filter: brightness(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translateX(-50%);
+    letter-spacing: 0.5em;
+    filter: brightness(1.4) saturate(1.25);
+    opacity: 1;
+  }
+  55% {
+    transform: translateX(-50%) scaleX(0.35) scaleY(1.08);
+    letter-spacing: 0.14em;
+    filter: brightness(1.9);
+    opacity: 1;
+  }
+  75% {
+    transform: translateX(-50%) scaleX(0.06) scaleY(1.2);
+    filter: brightness(3.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scaleX(0.01) scaleY(1);
+    filter: brightness(5);
+    opacity: 0;
   }
 }
 

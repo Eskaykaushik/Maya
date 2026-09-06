@@ -53,6 +53,7 @@ export class Maya {
     this.state = "dormant";
     this.sfx = new Sfx();
     this._chooserPoint = null;
+    this._capturing = false;
 
     this._bindUI();
   }
@@ -68,10 +69,7 @@ export class Maya {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         const text = this.inputEl.value.trim();
-        if (text) {
-          this._handleText(text);
-          this.inputEl.value = "";
-        }
+        if (text) this._captureAndSend(text);
       }
     });
 
@@ -135,12 +133,12 @@ export class Maya {
   _dismissChooser(opts = {}) {
     const c = this.chooserEl;
     if (c.hidden) {
-      if (!opts.silent) this._enter("dormant");
+      if (!opts.instant) this._enter("dormant");
       return;
     }
     c.classList.remove("is-visible");
     c.classList.add("is-dissolving");
-    if (!opts.silent) this.sfx.dismiss();
+    if (opts.sound !== false) this.sfx.dismiss();
     setTimeout(() => {
       c.hidden = true;
       c.classList.remove("is-dissolving");
@@ -148,19 +146,18 @@ export class Maya {
         this._enter("dormant");
         if (!this.materializer.active) this.promptEl.classList.remove("is-hidden");
       }
-    }, opts.silent ? 0 : 340);
+    }, opts.instant ? 0 : 300);
   }
 
   _onChooseBtn(mode) {
     const pt = this._chooserPoint || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    this._dismissChooser({ silent: true });
+    this.sfx.choose();
+    this._dismissChooser({ sound: false });
     if (mode === "type") {
-      this._revealInput(pt);
-      this.sfx.choose();
+      // Orbs fold into the point; the hairline draws from there and the lamp rises.
+      setTimeout(() => this._revealInput(pt), 120);
     } else {
-      this.voiceEl.style.setProperty("--from-x", pt.x);
-      this.voiceEl.style.setProperty("--from-y", pt.y);
-      this._openVoice(pt.x, pt.y);
+      setTimeout(() => this._openVoice(pt.x, pt.y), 160);
     }
   }
 
@@ -195,6 +192,36 @@ export class Maya {
       line.hidden = true;
       line.classList.remove("is-drawn");
     }, 700);
+  }
+
+  /**
+   * The genie send — the words narrow and are drawn into the lamp, then the
+   * lamp releases them as light and Maya answers.
+   */
+  async _captureAndSend(text) {
+    if (this._capturing) return;
+    this._capturing = true;
+    const input = this.inputEl;
+    const rect = input.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    input.classList.add("is-capturing");
+    input.setAttribute("disabled", "");
+    this.sfx.capture();
+
+    // Wait for the lamp to swallow the words.
+    await new Promise((r) => setTimeout(r, 560));
+
+    input.classList.remove("is-capturing");
+    input.removeAttribute("disabled");
+    input.value = "";
+    this._capturing = false;
+    this._enter("dormant");
+
+    // The lamp releases the words as light, then Maya materializes an answer.
+    this.renderer.burst(cx, cy);
+    await this._handleText(text);
   }
 
   /* ------------------------------------------------------------------ *

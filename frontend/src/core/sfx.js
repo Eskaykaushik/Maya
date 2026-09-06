@@ -47,9 +47,16 @@ export class Sfx {
     this._tone(360, 540, 0.2, 0.025, "sine", 0.05);
   }
 
-  /** A choice lands — soft settling tone. */
+  /** The input rises — light settling into a lamp. */
   choose() {
-    this._tone(220, 180, 0.14, 0.05, "sine");
+    this._tone(220, 190, 0.14, 0.05, "sine");
+  }
+
+  /** The genie inhale — words being drawn into the lamp. */
+  capture() {
+    this._tone(300, 560, 0.28, 0.045, "sine");
+    this._tone(320, 950, 0.42, 0.02, "sine", 0.1);
+    this._tone(700, 480, 0.12, 0.028, "triangle", 0.34);
   }
 
   /** The listening orb ignites. */
