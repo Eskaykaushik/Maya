@@ -20,6 +20,12 @@ And something appears.
 
 ---
 
+## Live
+
+**[eskaykaushik.github.io/Maya](https://eskaykaushik.github.io/Maya)** — deployed from `frontend/` to GitHub Pages on every push to `main`.
+
+---
+
 ## Quick Start
 
 Maya is a **browser-first** experience: a zero-build, vanilla HTML/CSS/JS frontend where everything is localized and instant. Audio capture, speech-to-text, tool logic, and file generation all run **in the browser** — no bundlers, no frameworks, no Node toolchain. Intelligence is an *optional* enhancement hosted by the Kaushix API agent (`POST /api/maya`) on Render.
@@ -36,7 +42,7 @@ That's it. Speak, and something appears.
 
 **Deployment**
 
-- Frontend → GitHub Pages (a `.github/workflows/pages.yml` deploy of `frontend/` on push to `main`).
+- Frontend → GitHub Pages (**https://eskaykaushik.github.io/Maya/** — a `.github/workflows/pages.yml` deploy of `frontend/` on push to `main`).
 - Intelligence → the `maya` agent inside [kaushix-api](https://github.com/Eskaykaushik/Kaushix-api-service), deployed on Render.
 
 ---
