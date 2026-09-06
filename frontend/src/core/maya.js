@@ -146,7 +146,7 @@ export class Maya {
         this._enter("dormant");
         if (!this.materializer.active) this.promptEl.classList.remove("is-hidden");
       }
-    }, opts.instant ? 0 : 300);
+    }, opts.instant ? 0 : 460);
   }
 
   _onChooseBtn(mode) {
@@ -155,9 +155,9 @@ export class Maya {
     this._dismissChooser({ sound: false });
     if (mode === "type") {
       // The orbs dissolve into the point the box is born from.
-      setTimeout(() => this._revealInput(), 120);
+      setTimeout(() => this._revealInput(), 240);
     } else {
-      setTimeout(() => this._openVoice(pt.x, pt.y), 160);
+      setTimeout(() => this._openVoice(pt.x, pt.y), 320);
     }
   }
 
@@ -295,7 +295,7 @@ export class Maya {
     setTimeout(() => {
       v.hidden = true;
       v.classList.remove("is-dissolving");
-    }, 420);
+    }, 560);
   }
 
   /* ------------------------------------------------------------------ *
