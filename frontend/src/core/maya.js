@@ -124,9 +124,10 @@ export class Maya {
 
   _clampPoint(x, y) {
     const m = 96;
+    const my = 168; // the vertical constellation needs room above and below
     return {
       x: Math.min(Math.max(m, x), window.innerWidth - m),
-      y: Math.min(Math.max(m, y), window.innerHeight - m),
+      y: Math.min(Math.max(my, y), window.innerHeight - my),
     };
   }
 

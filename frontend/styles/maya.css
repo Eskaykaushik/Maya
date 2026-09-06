@@ -545,9 +545,9 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 116px;
-  height: 116px;
-  margin: -58px 0 0 -58px;
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
   border-radius: 50%;
   border: 1px solid var(--maya-hairline);
   background:
@@ -562,16 +562,16 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   box-shadow:
-    0 0 36px rgba(120, 140, 255, 0.14),
-    inset 0 0 28px rgba(120, 140, 255, 0.08);
+    0 0 30px rgba(120, 140, 255, 0.14),
+    inset 0 0 22px rgba(120, 140, 255, 0.08);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Stations: type above, speak below — a vertical constellation. */
-.chooser-type { --sx: 72px; --sy: -124px; }
-.chooser-speak { --sx: -72px; --sy: 124px; }
+/* Stations: type above, speak below — centered on the tap point's vertical axis. */
+.chooser-type { --sx: 0px; --sy: -110px; }
+.chooser-speak { --sx: 0px; --sy: 110px; }
 .chooser-btn { transform: translate(var(--sx), var(--sy)); }
 
 /* The orbs bloom out of the core to their stations, then float lazily. */
@@ -619,7 +619,7 @@ body {
 .chooser-btn::before {
   content: "";
   position: absolute;
-  inset: -14px;
+  inset: -12px;
   border-radius: 50%;
   border: 1px solid rgba(150, 165, 255, 0.16);
   pointer-events: none;
@@ -685,7 +685,7 @@ body {
 
 .chooser-glyph {
   font-family: var(--maya-mono);
-  font-size: 34px;
+  font-size: 26px;
   font-weight: 200;
   color: rgba(205, 212, 255, 0.92);
   text-shadow: 0 0 20px rgba(120, 140, 255, 0.55);
@@ -693,8 +693,8 @@ body {
 }
 
 .chooser-label {
-  font-size: 11px;
-  letter-spacing: 0.26em;
+  font-size: 10px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--maya-dim);
 }
