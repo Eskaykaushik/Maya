@@ -20,6 +20,7 @@ export class Audio {
     this.recognition = null;
     this.listening = false;
     this.speechActive = false;
+    this.supportsSpeech = false;
     this._raf = 0;
 
     this._vad = {
@@ -116,6 +117,7 @@ export class Audio {
 
   _setupRecognition() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.supportsSpeech = !!SR;
     if (!SR) return;
     const rec = new SR();
     rec.lang = "en-US";

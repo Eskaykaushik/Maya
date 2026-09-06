@@ -55,9 +55,10 @@ export class Maya {
         onFinalText: (text) => this._handleText(text),
       });
       await this.audio.start();
-      this._enter("listening", true);
+      if (!this.audio.supportsSpeech) this._revealInput();
+      this._enter("listening");
     } catch {
-      this.inputEl.classList.add("is-visible");
+      this._revealInput();
       this._enter("listening");
     }
   }
@@ -72,13 +73,33 @@ export class Maya {
         }
       }
     });
+
+    // Make typing reachable even when the mic works: reveal + focus the input
+    // on the first click or keypress, so the keyboard path is always available.
+    document.addEventListener("pointerdown", () => {
+      if (!this.inputEl.classList.contains("is-visible")) this._revealInput();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (this.inputEl.classList.contains("is-visible")) return;
+      if (e.target !== document.body) return;
+      this._revealInput();
+      // keydown precedes the character insertion; re-add a printable key.
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        this.inputEl.value += e.key;
+      }
+    });
   }
 
-  _enter(state, keepListening = false) {
+  _revealInput() {
+    this.inputEl.classList.add("is-visible");
+    this.inputEl.focus({ preventScroll: true });
+  }
+
+  _enter(state) {
     this.state = state;
     this.promptEl.classList.toggle("is-hidden", state !== "dormant");
     if (this.renderer) this.renderer.setState(state);
-    if (this.audio) this.audio.setSpeaking(state === "thinking" || state === "materialized" || keepListening);
+    if (this.audio) this.audio.setSpeaking(state === "thinking" || state === "materialized");
   }
 
   async _handleText(text) {
