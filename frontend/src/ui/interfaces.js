@@ -133,14 +133,17 @@ function renderDiffComponent(spec, slots) {
     const b = readSource(spec, "sourceB", slots);
     if (a == null || b == null) {
       summary.textContent = "both sources need content to compare";
+      el._last = null;
       return null;
     }
-    el._apply({ items: diffLines(a, b), stats: diffStats(a, b) });
+    const result = { items: diffLines(a, b), stats: diffStats(a, b) };
+    el._last = result;
+    el._apply(result);
     return { ok: true };
   };
 
   el._apply(null);
-  return { el, getValue: () => null, setValue: () => {}, run: () => el._run() };
+  return { el, getValue: () => el._last || null, setValue: () => {}, run: () => el._run() };
 }
 
 function readSource(spec, prop, slots) {

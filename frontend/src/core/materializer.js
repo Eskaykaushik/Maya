@@ -22,22 +22,28 @@ export class Materializer {
   /**
    * Pick a pseudo-random landing position for a tool of the given size
    * (width/height), constrained to the configured safe region. Avoids the
-   * previous spot and keeps the tool fully inside the viewport.
+   * previous spot and keeps the tool clear of the sacred zones: the
+   * composer + footer band below and the top-left anchor dot above.
    */
   pickPosition(rect) {
     const cfg = (window.MAYA && window.MAYA.placement) || {};
-    const xMin = (cfg.xMin ?? 0.16) * window.innerWidth;
-    const xMax = (cfg.xMax ?? 0.84) * window.innerWidth;
-    const yMin = (cfg.yMin ?? 0.14) * window.innerHeight;
-    const yMax = (cfg.yMax ?? 0.86) * window.innerHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const xMin = Math.max((cfg.xMin ?? 0.16) * vw, this._anchorClearance());
+    const xMax = (cfg.xMax ?? 0.84) * vw;
+    const yMin = (cfg.yMin ?? 0.14) * vh;
+    // Sacred bottom band — the composer and footer must never be touched.
+    const yMax = Math.max(yMin, Math.min((cfg.yMax ?? 0.86) * vh, vh - this._bottomBand(vh)));
 
     const w = (rect && rect.width) || 0;
     const h = (rect && rect.height) || 0;
 
-    // Clamp the allowed region so the tool's bounding box stays visible.
+    // Clamp the allowed region so the tool's bottom stays on the safe side
+    // of the sacred band. A tool taller than the band rides upward (its top
+    // may leave the screen above) rather than spilling into the band.
     const rxMin = Math.min(xMin, Math.max(0, xMax - w));
     const rxMax = Math.max(rxMin + 1, xMax - w);
-    const ryMin = Math.min(yMin, Math.max(0, yMax - h));
+    const ryMin = Math.min(yMin, yMax - h);
     const ryMax = Math.max(ryMin + 1, yMax - h);
 
     let x = rxMin + Math.random() * (rxMax - rxMin);
@@ -68,6 +74,29 @@ export class Materializer {
     };
     this._last = { x: pos.cx, y: pos.cy };
     return pos;
+  }
+
+  /** How tall the sacred bottom band is — point of the composer, then footer. */
+  _bottomBand(vh) {
+    let band = 0;
+    for (const sel of ["#maya-input", ".site-footer"]) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (!rect || rect.height <= 0) continue;
+      band = Math.max(band, vh - Math.max(0, rect.top));
+    }
+    // Never let the band swallow the whole stage.
+    return Math.max(48, Math.min(Math.max(band, 48), vh * 0.5));
+  }
+
+  /** Left clearance so nothing ever covers the top-left anchor dot. */
+  _anchorClearance() {
+    const btn = document.querySelector(".chat-collapse");
+    if (!btn || btn.hidden) return 44;
+    const rect = btn.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return 44;
+    return rect.right + 10;
   }
 
   /**

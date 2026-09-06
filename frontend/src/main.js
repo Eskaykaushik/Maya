@@ -1,5 +1,4 @@
 import { Maya } from "./core/maya.js";
-import { render } from "./ui/interfaces.js";
 
 const CONTRACT_A = `SERVICE AGREEMENT
 
@@ -50,18 +49,14 @@ if (params.get("spec") === "demo") {
   };
 
   boot.then(() => {
-    const handle = render(spec, { sources });
-    if (!handle.el) return;
-    const el = handle.el;
-    el.addEventListener("maya:landed", (e) => {
-      maya.renderer.setFocus(e.detail.x, e.detail.y);
-      setTimeout(() => maya.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
-    });
-    maya.materializer.mount(el);
+    maya.showSpec(spec, { sources, reply: "comparing contracts…" });
     if (params.get("auto") === "1") {
-      const slot = handle.slots.get("compare");
-      const btn = slot && slot.el && slot.el.querySelector(".ghost-btn");
-      if (btn) setTimeout(() => btn.click(), 1200);
+      setTimeout(() => {
+        const handle = maya.interface;
+        const slot = handle && handle.slots.get("compare");
+        const btn = slot && slot.el && slot.el.querySelector(".ghost-btn");
+        if (btn) btn.click();
+      }, 1800);
     }
   });
 }

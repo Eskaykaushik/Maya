@@ -16,6 +16,10 @@ import { VoiceRenderer } from "../visual/voice-renderer.js";
 import { Materializer } from "./materializer.js";
 import { Sfx } from "./sfx.js";
 import { Registry } from "../tools/registry.js";
+import { render } from "../ui/interfaces.js";
+import { validate } from "../ui/spec.js";
+import { Store } from "../session/store.js";
+import { EventBus } from "../events/eventbus.js";
 import "../tools/timer.js";
 import "../tools/calculator.js";
 import "../tools/stopwatch.js";
@@ -58,6 +62,14 @@ export class Maya {
     this._capturing = false;
     this._lastToolRune = null;
 
+    // One-Thing screen — a response or an interface, tracked as state.
+    this.store = Store;
+    this.surface = "response";
+    this.interface = null;
+    this._lastSpec = null;
+    this._completionTimer = null;
+    this._responseTimer = null;
+
     this._bindUI();
   }
 
@@ -83,8 +95,24 @@ export class Maya {
       this._dismissVoice();
     });
 
-    // The thread's collapse dot — shrink or restore the conversation.
-    this.chatEl.querySelector(".chat-collapse").addEventListener("click", () => this._toggleChatCollapse());
+    // The top-left anchor — a general-purpose light for future integrations;
+    // for now it reveals a compact chat summary, never the whole thread.
+    this.chatEl.querySelector(".chat-collapse").addEventListener("click", () => this._toggleSummary());
+
+    // A tap on the dark while the summary is open folds it away — captured so
+    // the tap never also summons the Type / Speak chooser beneath it.
+    document.addEventListener("pointerdown", (e) => {
+      const panel = this._summaryPanel();
+      if (!panel || panel.hidden) return;
+      const t = e.target && typeof e.target.closest === "function" ? e.target : null;
+      if (t && t.closest(".maya-summary, .chat-collapse")) return;
+      this._closeSummary();
+      e.stopImmediatePropagation();
+    }, true);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this._closeSummary();
+    });
 
     // Tap the dark → summon the Type / Speak chooser at the screen's centre.
     document.addEventListener("pointerdown", (e) => {
@@ -332,6 +360,7 @@ export class Maya {
 
   async _handleText(text) {
     if (!text) return;
+    this._closeSummary();
     this._showTranscript(text);
 
     if (this.state === "voice" || this.state === "speaking" || this.state === "thinking") {
@@ -348,6 +377,13 @@ export class Maya {
     }
 
     this._enter("materialized");
+
+    // Phase 1 — a schema-driven interface: validate → render → mount → wire.
+    if (intent && intent.ui_spec) {
+      this._showInterface(intent.ui_spec, { reply: intent.reply });
+      this._commitTurn(text, intent.reply || "There.", intent.experience || "ui");
+      return;
+    }
 
     // The backend answered without summoning a tool — show its words.
     if (intent && intent._spoke) {
@@ -376,15 +412,15 @@ export class Maya {
         setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
       });
 
-      // When the tool finishes, dissolve and return to dormancy — its rune fades last.
-      el.addEventListener("maya:complete", () => {
-        this.materializer.dismiss();
-        if (this._lastToolRune) this._lastToolRune.classList.add("is-faded");
-        this._rest();
-      });
+      // When the tool finishes, dissolve and hand its held reply to the One-Thing screen.
+      el.addEventListener("maya:complete", () => this._onLegacyComplete(intent.reply));
 
       this.materializer.mount(el);
-      this._say(intent.reply || "");
+      // The interface is the one thing — the user's echo and any held reply
+      // are blanked instantly; nothing is co-visible in the reading dock.
+      this._dissolveResponse(true);
+      this.surface = "interface";
+      this.store.update({ surface: "interface", uiSpec: null, reply: intent.reply || null });
       this._commitTurn(text, intent.reply || "On it.", intent.experience);
     } else {
       const reply = `I don't know how to reveal "${intent.experience}" yet.`;
@@ -396,13 +432,28 @@ export class Maya {
 
   async _askBackend(text) {
     try {
+      const snapshot = this.store.snapshot();
       const res = await fetch(`${API_URL}/api/maya`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: [] }),
+        body: JSON.stringify({
+          message: text,
+          history: this.store.get().conversation.slice(-8),
+          session_id: snapshot.session_id,
+          ui_state: snapshot.ui_state,
+        }),
       });
       if (!res.ok) return null;
       const data = await res.json();
+      // New shape — a schema-driven interface (Phase 1).
+      if (data.ui_spec) {
+        return {
+          experience: (data.intent && data.intent.experience) || "ui",
+          ui_spec: data.ui_spec,
+          reply: data.reply,
+        };
+      }
+      // Old shape — reply-only or a tool call.
       const tc = data.tool_calls?.[0];
       if (!tc) {
         if (data.response) return { _spoke: true, reply: data.response };
@@ -437,6 +488,245 @@ export class Maya {
   }
 
   /* ------------------------------------------------------------------ *
+   *  One-Thing screen — a response or an interface, never both.
+   * ------------------------------------------------------------------ */
+
+  /** The hand-off response — blooms at centre, rests low & calm. */
+  _sayResponse(text) {
+    if (!text) return;
+    // While an interface lives, words are held, never shown beside it.
+    if (this.surface === "interface") {
+      this.store.update({ reply: text });
+      return;
+    }
+    this._enter("materialized");
+    const el = this.transcriptEl;
+    el.textContent = text;
+    el.classList.remove("is-dissolving", "is-quiet", "is-born");
+    void el.offsetWidth;
+    el.classList.add("is-born");
+    if (this._responseTimer) clearTimeout(this._responseTimer);
+    this._responseTimer = setTimeout(() => {
+      el.classList.remove("is-born");
+      el.classList.add("is-quiet");
+    }, 1300);
+  }
+
+  /** Fold whatever response is on screen back into the dark.
+    `instant` blanks it the moment a tool/interface claims the screen. */
+  _dissolveResponse(instant = false) {
+    const el = this.transcriptEl;
+    if (!el || !el.textContent) return;
+    if (this._responseTimer) clearTimeout(this._responseTimer);
+    if (instant) {
+      el.classList.remove("is-born", "is-quiet", "is-dissolving");
+      el.textContent = "";
+      return;
+    }
+    el.classList.remove("is-born", "is-quiet");
+    el.classList.add("is-dissolving");
+    this._responseTimer = setTimeout(() => {
+      el.textContent = "";
+      el.classList.remove("is-dissolving");
+    }, 500);
+  }
+
+  /** The lead-in phrase whispers in the thinking breath, not the dock. */
+  _whisper(text) {
+    const w = this.whisperEl;
+    if (!w || !text) return;
+    const t = w.querySelector(".maya-whisper-text");
+    if (t) t.textContent = text;
+    w.hidden = false;
+  }
+
+  /** Public seam — present a validated UI spec on the One-Thing screen. */
+  showSpec(spec, opts = {}) {
+    return this._showInterface(spec, opts);
+  }
+
+  _showInterface(spec, { reply, sources } = {}) {
+    const state = this.store.get();
+
+    // Follow-up specs re-target the SAME mounted interface — no remount.
+    if (this.interface && state.uiSpec && state.uiSpec.type === spec.type) {
+      return this._retargetInterface(spec, sources || {});
+    }
+
+    this._cancelCompletion();
+    this._dissolveResponse(true);
+
+    const verdict = validate(spec);
+    if (!verdict.ok) {
+      this._sayResponse(reply || "I could not build that interface.");
+      return null;
+    }
+
+    if (this.materializer.active) this.materializer.dismiss(true);
+
+    const mergedSources = Object.assign({}, sourcesFromSpec(spec), sources || {});
+    const handle = render(spec, { sources: mergedSources });
+    if (!handle.ok) {
+      this._sayResponse(reply || "I could not build that interface.");
+      return null;
+    }
+
+    this.surface = "interface";
+    this.interface = handle;
+    this._lastSpec = spec;
+    this.store.update({
+      surface: "interface",
+      intent: { task: spec.type },
+      uiSpec: spec,
+      componentStates: this._collectComponentStates(spec),
+      results: null,
+      reply: reply || null,
+    });
+    EventBus.emit("ui:spec", { spec });
+
+    if (reply) this._whisper(reply);
+
+    handle.subscribe((name, detail) => this._onUiEvent(name, detail));
+
+    handle.el.addEventListener("maya:landed", (e) => {
+      const { x, y } = e.detail;
+      this.renderer.setFocus(x, y);
+      setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
+    });
+
+    handle.el.addEventListener("maya:complete", () => this._onInterfaceComplete(spec, reply));
+
+    // The interface materializes and the lead-in fades with the whisper.
+    this._enter("thinking");
+    this.materializer.mount(handle.el);
+    setTimeout(() => this._enter("materialized"), 900);
+    return handle;
+  }
+
+  /** Re-target the live interface in place — apply new values and re-run. */
+  _retargetInterface(spec, sources) {
+    this._cancelCompletion();
+    const handle = this.interface;
+    const merged = Object.assign({}, sourcesFromSpec(spec), sources || {});
+    for (const c of spec.components) {
+      if (merged[c.id] !== undefined) handle.setValue(c.id, merged[c.id]);
+    }
+    for (const c of spec.components) {
+      if (c.type !== "diff") continue;
+      const slot = handle.slots.get(c.id);
+      if (slot && slot.run) slot.run();
+    }
+    this._lastSpec = spec;
+    this.store.update({
+      uiSpec: spec,
+      componentStates: this._collectComponentStates(spec),
+      results: this._collectResults(spec),
+    });
+    EventBus.emit("ui:spec", { spec, retarget: true });
+    return handle;
+  }
+
+  /** Interface user events → store + tool events. */
+  _onUiEvent(name, detail) {
+    const spec = this._lastSpec;
+    if (!spec || !this.interface) return;
+    if (name === "ui:change") {
+      this.store.update({ componentStates: this._collectComponentStates(spec) });
+      return;
+    }
+    if (name === "ui:action") {
+      EventBus.emit("tool:run", { action: detail });
+      for (const c of spec.components) {
+        if (c.type !== "diff") continue;
+        const slot = this.interface.slots.get(c.id);
+        if (slot && slot.run) slot.run();
+      }
+      this.store.update({
+        componentStates: this._collectComponentStates(spec),
+        results: this._collectResults(spec),
+      });
+      EventBus.emit("tool:result", { results: this.store.get().results, action: detail });
+      // Result → response hand-off: the interface yields, its result is spoken.
+      this._scheduleCompletion();
+    }
+  }
+
+  _collectComponentStates(spec) {
+    const out = {};
+    if (!this.interface) return out;
+    for (const c of spec.components || []) {
+      const slot = this.interface.slots.get(c.id);
+      if (!slot) continue;
+      const v = slot.getValue();
+      if (v !== null && v !== undefined) out[c.id] = v;
+    }
+    return out;
+  }
+
+  _collectResults(spec) {
+    const results = {};
+    for (const c of spec.components || []) {
+      if (c.type !== "diff") continue;
+      const slot = this.interface && this.interface.slots.get(c.id);
+      if (!slot) continue;
+      const r = slot.getValue();
+      if (r && r.stats) results[c.id] = r.stats;
+    }
+    return Object.keys(results).length ? results : null;
+  }
+
+  /** Legacy tool hand-off — dissolve, then its held reply becomes the one thing. */
+  _onLegacyComplete(heldReply) {
+    this._cancelCompletion();
+    this.materializer.dismiss();
+    if (this._lastToolRune) this._lastToolRune.classList.add("is-faded");
+    this.surface = "response";
+    this.store.update({ surface: "response", uiSpec: null, results: null, reply: heldReply || null });
+    if (heldReply) this._sayResponse(heldReply);
+    this._rest();
+  }
+
+  /** The result hand-off — interface dissolves, its result is the one thing. */
+  _onInterfaceComplete(spec, leadIn) {
+    this._cancelCompletion();
+    this.materializer.dismiss();
+    this.interface = null;
+    const state = this.store.get();
+    this.surface = "response";
+    const reply = this._buildResultReply(spec) || state.reply || leadIn || "There.";
+    this.store.update({ surface: "response", uiSpec: null, results: null, reply });
+    this._sayResponse(reply);
+    this._rest();
+  }
+
+  _buildResultReply(spec) {
+    const results = this.store.get().results;
+    if (!results) return null;
+    const stats = Object.values(results)[0];
+    if (!stats || typeof stats.removed === "undefined") return null;
+    const names = { removed: stats.removed === 1 ? "line" : "lines" };
+    return `done — ${stats.removed} ${names.removed} removed, ${stats.added} added.`;
+  }
+
+  _scheduleCompletion() {
+    const delay = (window.MAYA && window.MAYA.completionDelay) || 1500;
+    this._cancelCompletion();
+    this._completionTimer = setTimeout(() => {
+      const handle = this.interface;
+      if (!handle) return;
+      handle.el.classList.add("is-dissolving");
+      handle.el.dispatchEvent(new CustomEvent("maya:complete"));
+    }, delay);
+  }
+
+  _cancelCompletion() {
+    if (this._completionTimer) {
+      clearTimeout(this._completionTimer);
+      this._completionTimer = null;
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
    *  The thread — each turn's words fly from the centre into a small,
    *  quiet conversation at the top-left; old lines sink into memory.
    * ------------------------------------------------------------------ */
@@ -444,6 +734,10 @@ export class Maya {
   _commitTurn(userText, replyText, tool) {
     this._appendToChat(userText, { role: "user" });
     setTimeout(() => this._appendToChat(replyText, { role: "maya", tool }), 90);
+    const convo = this.store.get().conversation || [];
+    convo.push({ role: "user", text: userText });
+    if (replyText) convo.push({ role: "maya", text: replyText, tool: tool || null });
+    this.store.update({ conversation: convo.slice(-40) });
   }
 
   _appendToChat(text, { role, tool } = {}) {
@@ -493,24 +787,99 @@ export class Maya {
     entries.forEach((el, i) => el.classList.toggle("is-dim", i < entries.length - 3));
     chat.classList.add("has-thread");
     const spine = chat.querySelector(".chat-spine");
-    if (spine) spine.style.height = `${chat.classList.contains("is-collapsed") ? 0 : chat.scrollHeight}px`;
+    if (spine) spine.style.height = `${chat.scrollHeight}px`;
     const collapse = chat.querySelector(".chat-collapse");
     if (collapse && collapse.hidden) {
       collapse.hidden = false;
-      collapse.setAttribute("aria-expanded", String(!chat.classList.contains("is-collapsed")));
+      collapse.setAttribute("aria-expanded", "false");
     }
   }
 
-  _toggleChatCollapse() {
-    const chat = this.chatEl;
-    const collapsed = chat.classList.toggle("is-collapsed");
-    const collapse = chat.querySelector(".chat-collapse");
-    if (collapse) collapse.setAttribute("aria-expanded", String(!collapsed));
-    this._settleThread();
+  /* ------------------------------------------------------------------ *
+   *  The summary — the top-left anchor's one job for now: a compact
+   *  digest of the conversation, never the raw thread. Future
+   *  integrations claim the same anchor.
+   * ------------------------------------------------------------------ */
+
+  _toggleSummary() {
+    const panel = this._summaryPanel();
+    if (!panel) return;
+    const open = panel.hidden;
+    panel.hidden = !open;
+    this._setSummaryAria(!panel.hidden);
+    if (!panel.hidden) this._renderSummary();
+  }
+
+  _closeSummary() {
+    const panel = this._summaryPanel();
+    if (panel && !panel.hidden) {
+      panel.hidden = true;
+      this._setSummaryAria(false);
+    }
+  }
+
+  _summaryPanel() {
+    return document.getElementById("maya-summary");
+  }
+
+  _setSummaryAria(open) {
+    const collapse = this.chatEl.querySelector(".chat-collapse");
+    if (collapse) collapse.setAttribute("aria-expanded", String(open));
+  }
+
+  _renderSummary() {
+    const panel = this._summaryPanel();
+    if (!panel) return;
+    const list = panel.querySelector(".maya-summary-lines");
+    const empty = panel.querySelector(".maya-summary-empty");
+    const convo = this.store.get().conversation || [];
+    list.textContent = "";
+    if (!convo.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    const frag = document.createDocumentFragment();
+    for (const turn of convo) {
+      if (!turn || typeof turn.text !== "string" || !turn.text.trim()) continue;
+      const li = document.createElement("li");
+      li.className = `summary-line ${turn.role === "user" ? "line-user" : "line-maya"}`;
+      const marker = document.createElement("span");
+      marker.className = "summary-marker";
+      marker.textContent = turn.role === "user" ? "you" : "maya";
+      const body = document.createElement("span");
+      body.className = "summary-text";
+      let text = turn.text.replace(/\s+/g, " ").trim();
+      if (text.length > 72) text = text.slice(0, 69) + "…";
+      body.textContent = text;
+      li.append(marker, body);
+      if (turn.tool) {
+        const rune = document.createElement("span");
+        rune.className = "summary-tool";
+        rune.textContent = `⧖ ${turn.tool}`;
+        li.append(rune);
+      }
+      frag.append(li);
+    }
+    list.append(frag);
   }
 
   dispose() {
+    this._cancelCompletion();
+    if (this._responseTimer) clearTimeout(this._responseTimer);
     this.audio?.stop();
     this.renderer?.stop();
   }
+}
+
+/** Pull inline file values out of a spec so render/retarget can load them. */
+function sourcesFromSpec(spec) {
+  const sources = {};
+  for (const c of spec.components || []) {
+    if (c.type !== "file") continue;
+    const v = c.value;
+    if (typeof v === "string") sources[c.id] = { name: c.id, text: v };
+    else if (v && typeof v === "object" && "text" in v) sources[c.id] = v;
+  }
+  return sources;
 }
