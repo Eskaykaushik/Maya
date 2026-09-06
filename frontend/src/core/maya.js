@@ -320,13 +320,20 @@ export class Maya {
     // Tier 1 — instant on-device patterns.
     let intent = Registry.matchIntent(text);
 
-    // Tier 2 — Groq backend if patterns were inconclusive.
+    // Tier 2 — Groq/backend if patterns were inconclusive.
     if (!intent && API_URL) {
       this._enter("thinking");
       intent = await this._askBackend(text);
     }
 
     this._enter("materialized");
+
+    // The backend answered without summoning a tool — show its words.
+    if (intent && intent._spoke) {
+      if (intent.reply) this._say(intent.reply);
+      setTimeout(() => this._enter("dormant"), 1400);
+      return;
+    }
 
     if (!intent || !intent.experience) {
       this._say(intent?.reply || "I did not quite catch that. Try again?");
@@ -369,8 +376,8 @@ export class Maya {
       const data = await res.json();
       const tc = data.tool_calls?.[0];
       if (!tc) {
-        this._say(data.response || "");
-        return null;
+        if (data.response) return { _spoke: true, reply: data.response };
+        return { _spoke: true, reply: "" };
       }
       return {
         experience: tc.name,

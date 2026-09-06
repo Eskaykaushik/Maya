@@ -2,10 +2,10 @@
 // Window-load safety: this file runs as a plain script so the modules can read it.
 
 window.MAYA = Object.assign(window.MAYA || {}, {
-  // Optional intelligence backend (kaushix-api on Render).
+  // Intelligence backend — kaushix-api (Render), exposes POST /api/maya.
   // Maya is fully standalone without this — it only uses it for ambiguous
   // intents and rich file-content generation. Leave blank to disable.
-  apiUrl: "",
+  apiUrl: "https://kaushix-api-service.onrender.com",
 
   // Landing region for the magical, unpredictable placement engine:
   // the fraction of the viewport the interfaces may appear within.
