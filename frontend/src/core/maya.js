@@ -118,7 +118,7 @@ export class Maya {
   _openChooser() {
     this.promptEl.classList.add("is-hidden");
     const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
+    const cy = window.innerHeight * 0.42; // the command band, clear of the reading dock
     const pt = { x: cx, y: cy };
     this._chooserPoint = pt;
 

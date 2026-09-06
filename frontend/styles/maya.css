@@ -91,7 +91,7 @@ body {
 .maya-transcript {
   position: fixed;
   left: 50%;
-  bottom: 38%;
+  bottom: 26%;
   transform: translateX(-50%);
   z-index: 2;
   font-size: clamp(16px, 3vw, 24px);
@@ -124,13 +124,20 @@ body {
   transition: opacity 1.6s ease, text-shadow 1.6s ease, filter 1.6s ease;
 }
 
+/* A tool owns the stage — the reading line yields until it dissolves. */
+#maya-stage.has-tool .maya-transcript {
+  opacity: 0.25;
+  filter: blur(0.5px);
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+
 /* ---------------------------------------------------------------------------
    Thinking whisper — a soft amber breath where the answer will settle.
 --------------------------------------------------------------------------- */
 .maya-whisper {
   position: fixed;
   left: 50%;
-  bottom: 22%;
+  bottom: 18%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
