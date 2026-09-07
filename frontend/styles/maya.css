@@ -92,14 +92,14 @@ body {
    particles converging on the slot.
 --------------------------------------------------------------------------- */
 @keyframes maya-screen-unveil {
-  0%   { opacity: 0; scale: 0.93; filter: blur(16px) brightness(1.7); }
-  70%  { opacity: 1; filter: blur(0) brightness(1.15); }
-  100% { opacity: 1; scale: 1; filter: blur(0) brightness(1); }
+  0%   { opacity: 0; scale: 0.93; translate: 0 26px; filter: blur(16px) brightness(1.7); }
+  55%  { opacity: 1; filter: blur(0) brightness(1.15); }
+  100% { opacity: 1; scale: 1; translate: 0 0; filter: blur(0) brightness(1); }
 }
 
 @keyframes maya-screen-diffuse {
-  0%   { opacity: 1; scale: 1; filter: blur(0) brightness(1); }
-  100% { opacity: 0; scale: 0.97; filter: blur(12px) brightness(1); }
+  0%   { opacity: 1; scale: 1; translate: 0 0; filter: blur(0) brightness(1); }
+  100% { opacity: 0; scale: 0.97; translate: 0 18px; filter: blur(12px) brightness(1); }
 }
 
 /* ---------------------------------------------------------------------------
@@ -340,8 +340,23 @@ body {
   animation: maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.maya-tool.is-dissolving {
+.maya-tool.is-dissolving,
+.maya-tool.is-live.is-dissolving {
   animation: maya-screen-diffuse 1.2s ease-in both;
+}
+
+/* The outgoing screen's departure — it drifts softly downward, sinking away
+   from the slot it is about to hand over, so it never sits on top of the
+   arriving screen in the same place. */
+.maya-tool.is-yielding,
+.maya-tool.is-live.is-yielding {
+  animation: maya-yield-depart 1.2s cubic-bezier(0.45, 0, 0.55, 1) both;
+}
+
+@keyframes maya-yield-depart {
+  0%   { opacity: 1; scale: 1; translate: 0 0; filter: blur(0) brightness(1); }
+  30%  { opacity: 0; scale: 0.97; filter: blur(10px) brightness(1.1); }
+  100% { opacity: 0; scale: 0.93; translate: 0 20px; filter: blur(18px) brightness(1.18); }
 }
 
 /* Emergence: point → line → shape → interface */
