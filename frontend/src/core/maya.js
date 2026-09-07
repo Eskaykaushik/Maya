@@ -21,6 +21,7 @@ import { Sfx } from "./sfx.js";
 import { Capabilities } from "../capabilities/index.js";
 import { render } from "../ui/interfaces.js";
 import { validate } from "../ui/spec.js";
+import { renderMarkdown } from "../ui/markdown.js";
 import { Store } from "../session/store.js";
 import { EventBus } from "../events/eventbus.js";
 
@@ -125,9 +126,9 @@ export class Maya {
       meta.append(rune);
     }
 
-    const body = document.createElement("span");
+    const body = document.createElement("div");
     body.className = "chat-body";
-    body.textContent = text.replace(/\s+/g, " ").trim();
+    body.appendChild(renderMarkdown(text));
 
     li.append(meta, body);
     this.chatThreadEl.append(li);
@@ -536,9 +537,11 @@ export class Maya {
       this.store.update({ reply: text });
       return;
     }
-    const cleaned = text.replace(/\s+/g, " ").trim();
     const body = rows[rows.length - 1].querySelector(".chat-body");
-    if (body && body.textContent !== cleaned) body.textContent = cleaned;
+    if (body) {
+      body.textContent = "";
+      body.appendChild(renderMarkdown(text));
+    }
 
     const convo = this.store.get().conversation || [];
     for (let i = convo.length - 1; i >= 0; i--) {

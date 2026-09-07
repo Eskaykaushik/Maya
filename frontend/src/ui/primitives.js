@@ -3,6 +3,8 @@
  * one accent light per focal artifact. Styling lives in maya.css; these
  * functions only build structure and wire value/change behaviour. */
 
+import { renderMarkdown } from "./markdown.js";
+
 const make = (tag, className) => {
   const el = document.createElement(tag);
   if (className) el.className = className;
@@ -34,9 +36,14 @@ function renderText(spec) {
   const wrap = make("div", "ghost-block");
   if (spec.label) wrap.appendChild(label(spec.label));
   const el = make("p", "ghost-text");
-  el.textContent = spec.text || spec.label || "";
+  const fill = (v) => {
+    const t = v == null ? "" : String(v);
+    el.textContent = "";
+    el.appendChild(renderMarkdown(t));
+  };
+  fill(spec.text != null ? spec.text : spec.label || "");
   wrap.appendChild(el);
-  return { el: wrap, getValue: () => el.textContent, setValue: (v) => { el.textContent = v == null ? "" : String(v); } };
+  return { el: wrap, getValue: () => el.textContent, setValue: fill };
 }
 
 function renderButton(spec, dispatch) {
