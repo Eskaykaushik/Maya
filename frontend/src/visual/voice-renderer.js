@@ -85,6 +85,27 @@ export class VoiceRenderer {
     }
   }
 
+  /**
+   * A slow breath of particles for a screen change: energy eases up to
+   * `level` and back to calm over `ms`, so the particles converge on the
+   * focus (the generative screen) while its content unveils.
+   */
+  surge(level, ms = 1500) {
+    if (this._surgeTimer) cancelAnimationFrame(this._surgeTimer);
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / ms);
+      const eased = p * p * (3 - 2 * p); // smoothstep — 0 → level → 0
+      this.targetEnergy = level * eased;
+      if (p < 1) this._surgeTimer = requestAnimationFrame(step);
+      else {
+        this.targetEnergy = 0;
+        this._surgeTimer = 0;
+      }
+    };
+    this._surgeTimer = requestAnimationFrame(step);
+  }
+
   _syncParticles(target) {
     const ideal = Math.round(target * 900);
     const diff = ideal - this.particles.length;

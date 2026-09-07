@@ -86,13 +86,31 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Transcript — the user's words coalescing before they dissolve.
+   Generative screen — the ONE place where the latest thing lives: a
+   response or an interface, at the true centre of the dark. Shared slow
+   keyframes: the outgoing screen diffuses while the incoming one unveils,
+   particles converging on the slot.
+--------------------------------------------------------------------------- */
+@keyframes maya-screen-unveil {
+  0%   { opacity: 0; scale: 0.93; filter: blur(16px) brightness(1.7); }
+  70%  { opacity: 1; filter: blur(0) brightness(1.15); }
+  100% { opacity: 1; scale: 1; filter: blur(0) brightness(1); }
+}
+
+@keyframes maya-screen-diffuse {
+  0%   { opacity: 1; scale: 1; filter: blur(0) brightness(1); }
+  100% { opacity: 0; scale: 0.97; filter: blur(12px) brightness(1); }
+}
+
+/* ---------------------------------------------------------------------------
+   Transcript — the user's words coalescing, then the response unveils in
+   the same slot the interfaces use.
 --------------------------------------------------------------------------- */
 .maya-transcript {
   position: fixed;
   left: 50%;
-  bottom: 26%;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 2;
   font-size: clamp(16px, 3vw, 24px);
   font-weight: 300;
@@ -112,7 +130,7 @@ body {
 }
 
 .maya-transcript.is-dissolving {
-  animation: maya-dissolve 0.5s ease-in forwards;
+  animation: maya-screen-diffuse 1.2s ease-in both;
 }
 
 /* The last response persists — arriving bright, then resting calm & dim. */
@@ -124,26 +142,19 @@ body {
   transition: opacity 1.6s ease, text-shadow 1.6s ease, filter 1.6s ease;
 }
 
-/* The hand-off response blooms at the screen's centre, glides down,
-   and rests low & calm above the composer — One-Thing screen swap. */
+/* The response unveils on the generative screen, slow and gradual. */
 .maya-transcript.is-born {
   opacity: 1;
-  animation: maya-response-bloom 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes maya-response-bloom {
-  0%   { transform: translate(-50%, -26vh) scale(0.5); opacity: 0; filter: blur(16px) brightness(1.9); }
-  45%  { transform: translate(-50%, -14vh) scale(1.04); opacity: 1; filter: blur(0) brightness(1.25); }
-  100% { transform: translate(-50%, 0) scale(1); opacity: 1; filter: blur(0) brightness(1); }
+  animation: maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ---------------------------------------------------------------------------
-   Thinking whisper — a soft amber breath where the answer will settle.
+   Thinking whisper — a soft amber breath just below where the screen is.
 --------------------------------------------------------------------------- */
 .maya-whisper {
   position: fixed;
   left: 50%;
-  bottom: 24%;
+  top: calc(50% + 46px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -175,40 +186,10 @@ body {
 --------------------------------------------------------------------------- */
 .maya-chat {
   position: fixed;
-  top: 16px;
+  top: 18px;
   left: 18px;
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: 240px;
-  max-height: 46vh;
-  overflow: hidden;
-  padding-left: 16px;
   pointer-events: none;
-  opacity: 0.6;
-  transition: opacity 0.3s ease;
-}
-
-.maya-chat.has-thread {
-  pointer-events: auto;
-}
-
-.maya-chat:hover {
-  opacity: 1;
-}
-
-/* The constellation spine the entries hang off. */
-.chat-spine {
-  position: absolute;
-  left: 7px;
-  top: 4px;
-  width: 1px;
-  height: 0;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(150, 165, 255, 0.4), rgba(255, 255, 255, 0));
-  filter: drop-shadow(0 0 3px rgba(150, 165, 255, 0.5));
-  transition: height 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* The top-left anchor dot — a general-purpose light for future
@@ -228,88 +209,13 @@ body {
   cursor: pointer;
   appearance: none;
   outline: none;
+  pointer-events: auto;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .chat-collapse:hover {
   transform: scale(1.3);
   box-shadow: 0 0 18px rgba(150, 165, 255, 0.9);
-}
-
-.chat-entry {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.62);
-  text-shadow: 0 0 12px rgba(150, 165, 255, 0.25);
-  opacity: 0.85;
-  will-change: transform, opacity, filter;
-  transition: opacity 0.6s ease, filter 0.6s ease;
-}
-
-.entry-user {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.entry-user::before,
-.entry-maya::before {
-  content: "·";
-  margin-right: 7px;
-}
-
-.entry-user::before {
-  color: rgba(150, 165, 255, 0.8);
-  text-shadow: 0 0 8px rgba(150, 165, 255, 0.8);
-}
-
-.entry-maya::before {
-  color: rgba(255, 180, 120, 0.85);
-  text-shadow: 0 0 8px rgba(255, 170, 105, 0.8);
-}
-
-/* The tool that materialized, echoing into memory. */
-.chat-tool {
-  margin-left: 8px;
-  font-family: var(--maya-mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: rgba(150, 165, 255, 0.55);
-  transition: opacity 0.8s ease, filter 0.8s ease;
-}
-
-.chat-tool.is-faded {
-  opacity: 0.25;
-  filter: blur(0.5px);
-}
-
-/* Old lines sink into memory. */
-.chat-entry.is-dim {
-  opacity: 0.34;
-  filter: blur(0.4px);
-}
-
-/* A line flying from the centre into its slot. */
-.chat-entry.is-flying {
-  animation: maya-chat-fly 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes maya-chat-fly {
-  0% {
-    opacity: 0;
-    transform: translate(var(--flyx, 0px), var(--flyy, 0px)) scale(1.15);
-    filter: blur(6px) brightness(1.9);
-  }
-  55% {
-    opacity: 1;
-    transform: translate(var(--flyx, 0px), var(--flyy, 0px)) scale(1);
-    filter: blur(0) brightness(1.3);
-  }
-  100% {
-    opacity: 0.85;
-    transform: translate(0, 0) scale(1);
-    filter: blur(0) brightness(1);
-  }
 }
 
 /* The top-left anchor's panel — a compact digest of the conversation,
@@ -419,13 +325,16 @@ body {
 }
 
 .maya-tool {
-  --maya-emerge-duration: 0.6s;
   position: absolute;
   background: transparent;
   border-radius: 18px;
   padding: 28px 34px;
   color: var(--maya-fg);
-  animation: maya-emerge var(--maya-emerge-duration) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.maya-tool.is-dissolving {
+  animation: maya-screen-diffuse 1.2s ease-in both;
 }
 
 /* Emergence: point → line → shape → interface */
@@ -450,10 +359,6 @@ body {
   }
 }
 
-.maya-tool.is-dissolving {
-  animation: maya-dissolve 0.55s ease-in forwards;
-}
-
 /* Dissolution: back into nothing */
 @keyframes maya-dissolve {
   0% {
@@ -473,8 +378,8 @@ body {
 /* A subtle life while idle — excellent living. */
 .maya-tool.is-live {
   animation:
-    maya-emerge var(--maya-emerge-duration) cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    maya-tool-breathe 5s ease-in-out var(--maya-emerge-duration) infinite;
+    maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+    maya-tool-breathe 5s ease-in-out 1.4s infinite;
 }
 
 @keyframes maya-tool-breathe {

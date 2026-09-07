@@ -1,9 +1,10 @@
 /**
  * Materializer — makes intent become visible, and visible become nothing.
  *
- * Wraps the stage element where tool experiences live. Every tool the
- * registry creates is mounted here, emerges from a *fresh, unpredictable
- * point in the dark*, lives, and on request dissolves back into nothing.
+ * Wraps the stage element where the generative screen lives. Every response
+ * and interface is shown in one fixed place at the true centre of the dark,
+ * and changes into the next screen slowly — the outgoing screen diffuses
+ * while the incoming one unveils in place.
  */
 
 export class Materializer {
@@ -11,8 +12,6 @@ export class Materializer {
     this.stage = stageEl;
     this.current = null;
     this._destroyFn = null;
-    // Remembers the previous landing spot so the next one tends to be elsewhere.
-    this._last = null;
   }
 
   get active() {
@@ -20,59 +19,32 @@ export class Materializer {
   }
 
   /**
-   * Pick a pseudo-random landing position for a tool of the given size
-   * (width/height), constrained to the configured safe region. Avoids the
-   * previous spot and keeps the tool clear of the sacred zones: the
-   * composer + footer band below and the top-left anchor dot above.
+   * The generative screen — one fixed place, the true centre of the dark.
+   * Left/top are the tool's top-left, so its centre lands mid-screen. The
+   * sacred zones still clamp it: the top-left anchor dot above and the
+   * composer + footer band below.
    */
-  pickPosition(rect) {
-    const cfg = (window.MAYA && window.MAYA.placement) || {};
+  computeSlot(rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const xMin = Math.max((cfg.xMin ?? 0.16) * vw, this._anchorClearance());
-    const xMax = (cfg.xMax ?? 0.84) * vw;
-    const yMin = (cfg.yMin ?? 0.14) * vh;
-    // Sacred bottom band — the composer and footer must never be touched.
-    const yMax = Math.max(yMin, Math.min((cfg.yMax ?? 0.86) * vh, vh - this._bottomBand(vh)));
-
     const w = (rect && rect.width) || 0;
     const h = (rect && rect.height) || 0;
 
-    // Clamp the allowed region so the tool's bottom stays on the safe side
-    // of the sacred band. A tool taller than the band rides upward (its top
-    // may leave the screen above) rather than spilling into the band.
-    const rxMin = Math.min(xMin, Math.max(0, xMax - w));
-    const rxMax = Math.max(rxMin + 1, xMax - w);
-    const ryMin = Math.min(yMin, yMax - h);
-    const ryMax = Math.max(ryMin + 1, yMax - h);
+    const cy = vh / 2;
+    const safeBottom = vh - Math.max(48, this._bottomBand(vh)) - 8;
 
-    let x = rxMin + Math.random() * (rxMax - rxMin);
-    let y = ryMin + Math.random() * (ryMax - ryMin);
+    const x = Math.max(this._anchorClearance(), Math.round(vw / 2 - w / 2));
+    // Clamp vertically to the band above the composer + footer; a screen
+    // taller than the space rides upward rather than spilling into it.
+    let y = Math.round(cy - h / 2);
+    if (y + h > safeBottom) y = Math.max(0, safeBottom - h);
 
-    // Gently discourage stacking on the previous spot.
-    if (this._last) {
-      const away = this._last;
-      const dx = (rxMax - rxMin) / 2;
-      const dy = (ryMax - ryMin) / 2;
-      const cx = rxMin + Math.random() * (rxMax - rxMin);
-      const cy = ryMin + Math.random() * (ryMax - ryMin);
-      // With some probability, push away from the last position's half.
-      if (Math.abs(away.x - x) < dx * 0.5 && Math.random() < 0.7) {
-        x = cx < away.x ? rxMin + dx*0.2 : rxMax - dx*0.2;
-      }
-      if (Math.abs(away.y - y) < dy * 0.5 && Math.random() < 0.7) {
-        y = cy < away.y ? ryMin + dy*0.2 : ryMax - dy*0.2;
-      }
-    }
-
-    // The anchor is the tool's top-left; we want its center at (x, y).
     const pos = {
       x: Math.round(x),
       y: Math.round(y),
-      cx: Math.round(x + w / 2),
+      cx: Math.round(vw / 2),
       cy: Math.round(y + h / 2),
     };
-    this._last = { x: pos.cx, y: pos.cy };
     return pos;
   }
 
@@ -100,11 +72,32 @@ export class Materializer {
   }
 
   /**
-   * Mount a rendered experience on the stage at an unpredictable position.
+   * Mount a rendered experience on the stage at the generative screen.
+   * With `crossfade`, the previous screen is left to diffuse out slowly
+   * while the new one unveils in the same slot.
    */
-  mount(el) {
-    this.dismiss(true);
+  mount(el, opts = {}) {
+    const prev = this.current;
+    const prevDestroy = this._destroyFn;
+
+    if (prev) {
+      if (opts.crossfade !== false) {
+        const doomed = prev;
+        doomed.classList.add("is-dissolving");
+        setTimeout(() => {
+          if (doomed.parentNode === this.stage) doomed.remove();
+          if (!this.stage.querySelector(".maya-tool")) {
+            this.stage.classList.remove("has-tool");
+          }
+        }, 1250);
+      } else {
+        if (prevDestroy) { try { prevDestroy(); } catch {} }
+        prev.remove();
+      }
+    }
+
     this.current = el;
+    this._destroyFn = el?._maya?.destroy || null;
     this.stage.appendChild(el);
     this.stage.classList.add("has-tool");
 
@@ -112,13 +105,11 @@ export class Materializer {
     // unaffected by the emergence animation's scale transform.
     const w = el.offsetWidth || 0;
     const h = el.offsetHeight || 0;
-    const pos = this.pickPosition({ width: w, height: h });
+    const pos = this.computeSlot({ width: w, height: h });
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
 
-    this._destroyFn = el?._maya?.destroy || null;
-
-    // Tell the world where it landed so particles can converge there.
+    // Tell the world where the screen is so particles converge there.
     el.dispatchEvent(new CustomEvent("maya:landed", { detail: { x: pos.cx, y: pos.cy } }));
     return el;
   }
@@ -148,7 +139,7 @@ export class Materializer {
     }
 
     el.classList.add("is-dissolving");
-    setTimeout(() => remove(), 600);
+    setTimeout(() => remove(), 1250);
   }
 
   clearAll() {

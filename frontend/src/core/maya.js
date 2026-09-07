@@ -60,7 +60,6 @@ export class Maya {
     this.sfx = new Sfx();
     this._chooserPoint = null;
     this._capturing = false;
-    this._lastToolRune = null;
 
     // One-Thing screen — a response or an interface, tracked as state.
     this.store = Store;
@@ -69,6 +68,8 @@ export class Maya {
     this._lastSpec = null;
     this._completionTimer = null;
     this._responseTimer = null;
+    this._pulseTimer = null;
+    this._sessionStarted = false;
 
     this._bindUI();
   }
@@ -126,7 +127,7 @@ export class Maya {
     // Tap the dark → summon the Type / Speak chooser at the screen's centre.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, .chooser-btn, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .chooser-btn, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
       if (this.materializer.active) return;
       if (this.state === "prompting") {
         this._dismissChooser();
@@ -174,6 +175,22 @@ export class Maya {
     this._enter("prompting");
   }
 
+  /** The home greeting (banner) belongs to the very first moment only —
+    once the first interaction begins it is gone for the whole session. */
+  _sessionActive() {
+    this._sessionStarted = true;
+    this.promptEl.classList.add("is-hidden");
+    this._revealAnchor();
+  }
+
+  _revealAnchor() {
+    const collapse = this.chatEl.querySelector(".chat-collapse");
+    if (collapse && collapse.hidden) {
+      collapse.hidden = false;
+      collapse.setAttribute("aria-expanded", "false");
+    }
+  }
+
   _dismissChooser(opts = {}) {
     const c = this.chooserEl;
     if (c.hidden) {
@@ -188,7 +205,7 @@ export class Maya {
       c.classList.remove("is-dissolving");
       if (this.state === "prompting") {
         this._enter("dormant");
-        if (!this.materializer.active) this.promptEl.classList.remove("is-hidden");
+        if (!this._sessionStarted && !this.materializer.active) this.promptEl.classList.remove("is-hidden");
       }
     }, opts.instant ? 0 : 460);
   }
@@ -253,7 +270,7 @@ export class Maya {
     if (!this.inputEl.classList.contains("is-visible")) return;
     this.inputEl.value = "";
     this._hideInput();
-    this.promptEl.classList.remove("is-hidden");
+    if (!this._sessionStarted) this.promptEl.classList.remove("is-hidden");
     this._enter("dormant");
   }
 
@@ -263,6 +280,7 @@ export class Maya {
    */
   async _captureAndSend(text) {
     if (this._capturing) return;
+    this._sessionActive();
     this._capturing = true;
     const input = this.inputEl;
     const rect = input.getBoundingClientRect();
@@ -369,6 +387,7 @@ export class Maya {
 
   async _handleText(text) {
     if (!text) return;
+    this._sessionActive();
     this._closeSummary();
     this._showTranscript(text);
 
@@ -495,6 +514,7 @@ export class Maya {
     const el = this.transcriptEl;
     el.textContent = text;
     el.classList.remove("is-dissolving", "is-quiet");
+    this.store.update({ reply: text });
     // The reply arrives bright, then settles into a calm & dim hold.
     setTimeout(() => el.classList.add("is-quiet"), 2200);
   }
@@ -517,11 +537,29 @@ export class Maya {
     el.classList.remove("is-dissolving", "is-quiet", "is-born");
     void el.offsetWidth;
     el.classList.add("is-born");
+    this.store.update({ reply: text });
+    this._transitionPulse();
     if (this._responseTimer) clearTimeout(this._responseTimer);
     this._responseTimer = setTimeout(() => {
       el.classList.remove("is-born");
       el.classList.add("is-quiet");
-    }, 1300);
+    }, 1500);
+  }
+
+  /** Breathe a slow surge of particles around the generative screen as its
+    content unveils — everything returns to the calm at the centre. */
+  _transitionPulse() {
+    let cy = window.innerHeight / 2;
+    const el = this.interface && this.interface.el;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r && r.height) cy = r.top + r.height / 2;
+    }
+    const cx = window.innerWidth / 2;
+    if (this._pulseTimer) clearTimeout(this._pulseTimer);
+    this.renderer.setFocus(cx, cy);
+    this.renderer.surge(0.55, 1500);
+    this._pulseTimer = setTimeout(() => this.renderer.burst(cx, cy), 620);
   }
 
   /** Fold whatever response is on screen back into the dark.
@@ -540,7 +578,7 @@ export class Maya {
     this._responseTimer = setTimeout(() => {
       el.textContent = "";
       el.classList.remove("is-dissolving");
-    }, 500);
+    }, 1250);
   }
 
   /** The lead-in phrase whispers in the thinking breath, not the dock. */
@@ -558,6 +596,7 @@ export class Maya {
   }
 
   _showInterface(spec, { reply, sources } = {}) {
+    this._sessionActive();
     const state = this.store.get();
 
     // Follow-up specs re-target the SAME mounted interface — no remount.
@@ -573,8 +612,6 @@ export class Maya {
       this._sayResponse(reply || "I could not build that interface.");
       return null;
     }
-
-    if (this.materializer.active) this.materializer.dismiss(true);
 
     const mergedSources = Object.assign({}, sourcesFromSpec(spec), sources || {});
     const handle = render(spec, { sources: mergedSources });
@@ -611,6 +648,7 @@ export class Maya {
     // The interface materializes and the lead-in fades with the whisper.
     this._enter("thinking");
     this.materializer.mount(handle.el);
+    this._transitionPulse();
     setTimeout(() => this._enter("materialized"), 900);
     return handle;
   }
@@ -634,6 +672,8 @@ export class Maya {
       componentStates: this._collectComponentStates(spec),
       results: this._collectResults(spec),
     });
+    this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2);
+    this.renderer.surge(0.25, 1200);
     EventBus.emit("ui:spec", { spec, retarget: true });
     return handle;
   }
@@ -691,7 +731,6 @@ export class Maya {
   _onLegacyComplete(heldReply) {
     this._cancelCompletion();
     this.materializer.dismiss();
-    if (this._lastToolRune) this._lastToolRune.classList.add("is-faded");
     this.surface = "response";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply: heldReply || null });
     if (heldReply) this._sayResponse(heldReply);
@@ -739,72 +778,17 @@ export class Maya {
   }
 
   /* ------------------------------------------------------------------ *
-   *  The thread — each turn's words fly from the centre into a small,
-   *  quiet conversation at the top-left; old lines sink into memory.
+   *  Turns — kept only in memory (store) for the anchor's summary; the
+   *  main screen reserves itself for the One Thing: latest response or
+   *  interface. The hidden top-left anchor appears with the first turn.
    * ------------------------------------------------------------------ */
 
   _commitTurn(userText, replyText, tool) {
-    this._appendToChat(userText, { role: "user" });
-    setTimeout(() => this._appendToChat(replyText, { role: "maya", tool }), 90);
+    this._revealAnchor();
     const convo = this.store.get().conversation || [];
     convo.push({ role: "user", text: userText });
     if (replyText) convo.push({ role: "maya", text: replyText, tool: tool || null });
     this.store.update({ conversation: convo.slice(-40) });
-  }
-
-  _appendToChat(text, { role, tool } = {}) {
-    if (!text || !text.trim()) return;
-    const entry = document.createElement("p");
-    entry.className = `chat-entry entry-${role}`;
-    if (tool) {
-      const rune = document.createElement("span");
-      rune.className = "chat-tool";
-      rune.textContent = `⧖ ${tool}`;
-      entry.append(document.createTextNode(text), rune);
-      this._lastToolRune = rune;
-    } else {
-      entry.textContent = text;
-    }
-    this._flyInto(entry);
-    this._settleThread();
-  }
-
-  _flyInto(entry) {
-    this.chatEl.appendChild(entry);
-    const target = entry.getBoundingClientRect();
-    const origin = this.transcriptEl && !this.transcriptEl.classList.contains("is-dissolving")
-      ? this.transcriptEl.getBoundingClientRect()
-      : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
-    const ox = origin.left + (origin.width || 0) / 2;
-    const oy = origin.top + (origin.height || 0) / 2;
-    const x = Math.round(ox - (target.left + target.width / 2));
-    const y = Math.round(oy - (target.top + target.height / 2));
-    entry.style.setProperty("--flyx", `${x}px`);
-    entry.style.setProperty("--flyy", `${y}px`);
-    entry.classList.add("is-flying");
-    this.sfx.chime();
-    const land = entry.getBoundingClientRect();
-    setTimeout(() => {
-      entry.classList.remove("is-flying");
-      entry.style.removeProperty("--flyx");
-      entry.style.removeProperty("--flyy");
-      this.renderer.burst(land.left + land.width / 2, land.top + land.height / 2);
-    }, 760);
-  }
-
-  _settleThread() {
-    const chat = this.chatEl;
-    const entries = Array.from(chat.querySelectorAll(".chat-entry"));
-    while (entries.length > 20) entries.shift().remove();
-    entries.forEach((el, i) => el.classList.toggle("is-dim", i < entries.length - 3));
-    chat.classList.add("has-thread");
-    const spine = chat.querySelector(".chat-spine");
-    if (spine) spine.style.height = `${chat.scrollHeight}px`;
-    const collapse = chat.querySelector(".chat-collapse");
-    if (collapse && collapse.hidden) {
-      collapse.hidden = false;
-      collapse.setAttribute("aria-expanded", "false");
-    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -879,6 +863,7 @@ export class Maya {
   dispose() {
     this._cancelCompletion();
     if (this._responseTimer) clearTimeout(this._responseTimer);
+    if (this._pulseTimer) clearTimeout(this._pulseTimer);
     this.audio?.stop();
     this.renderer?.stop();
   }
