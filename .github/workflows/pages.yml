@@ -54,6 +54,10 @@ jobs:
 
   deploy:
     needs: build
+    # Only main may publish the artifact — the github-pages environment
+    # restricts deployments to the main branch. dev pushes re-run the build
+    # (archiving both branches), but never attempt the deploy.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
