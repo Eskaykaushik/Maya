@@ -7,6 +7,14 @@ window.MAYA = Object.assign(window.MAYA || {}, {
   // intents and rich file-content generation. Leave blank to disable.
   apiUrl: "https://kaushix-api-service.onrender.com",
 
+  // Ordered failover hosts for /api/maya, tried only when the primary is
+  // unreachable (network error, timeout, or non-2xx). Same response shape —
+  // Supabase edge function first (warm, low latency), then the HF Spaces copy.
+  fallbackApiUrls: [
+    "https://tysjdmvykwdxxyxnfzbd.supabase.co/functions/v1/maya",
+    "https://eskaykaushik-kaushix-api.hf.space",
+  ],
+
   // Landing region for the magical, unpredictable placement engine:
   // the fraction of the viewport the interfaces may appear within.
   placement: {

@@ -458,24 +458,46 @@ export class Maya {
     }
   }
 
-  async _askBackend(text) {
+  /** POST /api/maya to one candidate host with a hard timeout. */
+  async _postMaya(base, payload, timeoutMs = 25000) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const snapshot = this.store.snapshot();
-      const res = await fetch(`${API_URL}/api/maya`, {
+      return await fetch(`${base}/api/maya`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          history: this.store.get().conversation.slice(-8).map((turn) => ({
-            role: turn.role,
-            content: turn.text,
-          })),
-          session_id: snapshot.session_id,
-          ui_state: snapshot.ui_state,
-        }),
+        body: JSON.stringify(payload),
+        signal: ctl.signal,
       });
-      if (!res.ok) return null;
-      const data = await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  async _askBackend(text) {
+    // Blank apiUrl still means "backend disabled" — fallbacks never kick in.
+    if (!API_URL) return null;
+    const snapshot = this.store.snapshot();
+    const payload = {
+      message: text,
+      history: this.store.get().conversation.slice(-8).map((turn) => ({
+        role: turn.role,
+        content: turn.text,
+      })),
+      session_id: snapshot.session_id,
+      ui_state: snapshot.ui_state,
+    };
+    // Primary first, then each fallback, on network error / timeout / non-2xx.
+    const candidates = [API_URL, ...(window.MAYA?.fallbackApiUrls || [])].filter(Boolean);
+    for (const base of candidates) {
+      let data;
+      try {
+        const res = await this._postMaya(base, payload);
+        if (!res.ok) continue;
+        data = await res.json();
+      } catch {
+        continue;
+      }
       // New shape — a schema-driven interface (Phase 1).
       if (data.ui_spec) {
         return {
@@ -495,9 +517,8 @@ export class Maya {
         params: tc.arguments || {},
         reply: data.response,
       };
-    } catch {
-      return null;
     }
+    return null;
   }
 
   _showTranscript(text) {
