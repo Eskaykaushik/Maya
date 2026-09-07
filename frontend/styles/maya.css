@@ -156,12 +156,14 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Thinking whisper — a soft amber breath just below where the screen is.
+   Thinking whisper — a soft amber breath just above the composer,
+   the quiet "typing…" presence of the conversation. It never collides
+   with the centred thread.
 --------------------------------------------------------------------------- */
 .maya-whisper {
   position: fixed;
   left: 50%;
-  top: calc(50% + 46px);
+  bottom: calc(5% + 52px + 62px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -226,24 +228,30 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Chat background — the persistent, dim thread behind everything.
-   Maya's words live here. When a tool takes center stage, the thread
-   stays visible behind it (dim), giving context without competing.
+   Chat background — the conversation thread, centred and living just
+   behind the tool canvas. Messages float as quiet Telegram-style bubbles.
+   Maya's words live here; when a tool materializes it lands right on top,
+   the thread staying visible (dim) behind it, giving context without
+   competing.
 --------------------------------------------------------------------------- */
 .maya-chat-bg {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 2;
   pointer-events: none;
+  width: min(74vw, 500px);
+  max-height: min(54vh, 400px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 72px 24px 120px;
+  padding: 8px 4px;
   mask-image: linear-gradient(
-    to bottom, transparent 0%, rgba(0,0,0,0.35) 15%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,1) 100%
+    to bottom, transparent 0%, rgba(0,0,0,0.55) 12%, rgba(0,0,0,1) 28%
   );
   -webkit-mask-image: linear-gradient(
-    to bottom, transparent 0%, rgba(0,0,0,0.35) 15%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,1) 100%
+    to bottom, transparent 0%, rgba(0,0,0,0.55) 12%, rgba(0,0,0,1) 28%
   );
   opacity: 0;
   transition: opacity 1.8s ease;
@@ -259,7 +267,7 @@ body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   max-height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
@@ -268,54 +276,81 @@ body {
 .chat-bg-thread::-webkit-scrollbar { display: none; }
 
 @keyframes chat-row-in {
-  0%   { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+  0%   { opacity: 0; transform: translateY(8px); filter: blur(4px); }
   100% { opacity: 1; transform: translateY(0);   filter: blur(0); }
 }
 
+/* ---------------------------------------------------------------------------
+   Chat bubbles — floating message cards, no border, Telegram-like two-sided
+   alignment: the user's words on the right, Maya's on the left. A tiny mono
+   label rests above each bubble; a tool chip rides the label row.
+--------------------------------------------------------------------------- */
 .chat-row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  line-height: 1.55;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.42);
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(80%, 420px);
   animation: chat-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-  max-width: min(84vw, 480px);
 }
 
-.chat-row .chat-marker {
-  flex: 0 0 auto;
+.chat-row.is-maya {
+  align-self: flex-start;
+}
+
+.chat-row.is-user {
+  align-self: flex-end;
+}
+
+.chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--maya-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
+  font-size: 8px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
-.chat-row.is-user .chat-marker { color: rgba(150, 165, 255, 0.55); }
-.chat-row.is-maya .chat-marker { color: rgba(255, 180, 120, 0.55); }
+.chat-row.is-maya .chat-meta { justify-content: flex-start; }
+.chat-row.is-user .chat-meta  { justify-content: flex-end; }
 
-.chat-row .chat-body {
+.chat-marker {
+  opacity: 0.75;
+}
+
+.chat-row.is-user .chat-marker { color: rgba(150, 165, 255, 0.7); }
+.chat-row.is-maya .chat-marker { color: rgba(255, 180, 120, 0.7); }
+
+.chat-tool {
+  letter-spacing: 0.1em;
+  color: rgba(150, 165, 255, 0.55);
+}
+
+.chat-body {
+  padding: 9px 15px;
+  border-radius: 16px;
+  line-height: 1.55;
+  font-size: 13px;
   word-break: break-word;
-  color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
 }
 
 .chat-row.is-maya .chat-body {
-  color: rgba(255, 255, 255, 0.48);
+  border-bottom-left-radius: 5px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(245, 246, 255, 0.78);
 }
 
-.chat-row .chat-tool {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-family: var(--maya-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: rgba(150, 165, 255, 0.4);
+.chat-row.is-user .chat-body {
+  border-bottom-right-radius: 5px;
+  background: rgba(150, 165, 255, 0.09);
+  color: rgba(222, 228, 255, 0.92);
 }
 
 /* When a tool is on the fixed canvas, the background thread dims further
    to push focus forward onto the interface. */
 .maya-chat-bg.is-dimmed {
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 /* ---------------------------------------------------------------------------

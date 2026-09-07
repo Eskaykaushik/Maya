@@ -110,23 +110,26 @@ export class Maya {
     const li = document.createElement("li");
     li.className = `chat-row ${role === "user" ? "is-user" : "is-maya"}`;
 
+    const meta = document.createElement("span");
+    meta.className = "chat-meta";
+
     const marker = document.createElement("span");
     marker.className = "chat-marker";
     marker.textContent = role === "user" ? "you" : "maya";
-
-    const body = document.createElement("span");
-    body.className = "chat-body";
-    body.textContent = text.replace(/\s+/g, " ").trim();
-
-    li.append(marker, body);
+    meta.append(marker);
 
     if (tool) {
       const rune = document.createElement("span");
       rune.className = "chat-tool";
       rune.textContent = `⧖ ${tool}`;
-      li.append(rune);
+      meta.append(rune);
     }
 
+    const body = document.createElement("span");
+    body.className = "chat-body";
+    body.textContent = text.replace(/\s+/g, " ").trim();
+
+    li.append(meta, body);
     this.chatThreadEl.append(li);
   }
 
