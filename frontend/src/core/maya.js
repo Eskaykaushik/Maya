@@ -440,6 +440,13 @@ export class Maya {
         setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
       });
 
+      // Increment F — assemble the interface from a directional particle
+      // stream that arrives just as the swelling content clears the centre.
+      el.addEventListener("maya:stream", (e) => {
+        const { x, y } = e.detail;
+        setTimeout(() => this.renderer.stream(x, y), 480);
+      });
+
       // When the tool finishes, dissolve and hand its held reply to the One-Thing screen.
       el.addEventListener("maya:complete", () => this._onLegacyComplete(intent.reply));
 
@@ -559,6 +566,8 @@ export class Maya {
     void el.offsetWidth;
     el.classList.add("is-born");
     this.store.update({ reply: text });
+    // Increment F — a directional stream assembles the response into place.
+    this.renderer.stream(window.innerWidth / 2, window.innerHeight / 2);
     this._transitionPulse();
     if (this._responseTimer) clearTimeout(this._responseTimer);
     this._responseTimer = setTimeout(() => {

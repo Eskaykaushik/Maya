@@ -142,10 +142,18 @@ body {
   transition: opacity 1.6s ease, text-shadow 1.6s ease, filter 1.6s ease;
 }
 
-/* The response unveils on the generative screen, slow and gradual. */
+/* The response unveils on the generative screen, slow and gradual, its
+   letter-spacing tightening from a scattered blur into the final form. */
 .maya-transcript.is-born {
   opacity: 1;
-  animation: maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation:
+    maya-text-assemble 0.8s cubic-bezier(0.16, 1, 0.3, 1) both,
+    maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes maya-text-assemble {
+  0%   { opacity: 0; letter-spacing: 0.4em; filter: blur(8px); }
+  100% { opacity: 1; letter-spacing: 0.05em; filter: blur(0); }
 }
 
 /* ---------------------------------------------------------------------------
@@ -385,6 +393,34 @@ body {
 @keyframes maya-tool-breathe {
   0%, 100% { box-shadow: 0 0 20px 0 rgba(255, 255, 255, 0.03); }
   50%      { box-shadow: 0 0 38px 6px rgba(255, 255, 255, 0.06); }
+}
+
+/* ---------------------------------------------------------------------------
+   Increment F — particle assembly. While the interface swells in, its
+   children stagger up one by one, as if the particles that streamed in
+   each formed into a component. Default animatable children start inert so
+   the settle rules are the only thing that moves them.
+---------------------------------------------------------------------------- */
+.maya-tool.is-assembling {
+  animation-name: none;
+}
+
+.maya-tool.is-assembling > .ui-stack > * {
+  opacity: 0;
+  animation-name: maya-component-appear;
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.maya-tool.is-assembling > .ui-stack > *:nth-child(2)   { animation-delay: 0.10s; }
+.maya-tool.is-assembling > .ui-stack > *:nth-child(3)   { animation-delay: 0.20s; }
+.maya-tool.is-assembling > .ui-stack > *:nth-child(4)   { animation-delay: 0.30s; }
+.maya-tool.is-assembling > .ui-stack > *:nth-child(n+5) { animation-delay: 0.40s; }
+
+@keyframes maya-component-appear {
+  0%   { opacity: 0; transform: translateY(8px); filter: blur(6px); }
+  100% { opacity: 1; transform: translateY(0);   filter: blur(0); }
 }
 
 /* ---------------------------------------------------------------------------

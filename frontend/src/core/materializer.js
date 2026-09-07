@@ -111,6 +111,10 @@ export class Materializer {
 
     // Tell the world where the screen is so particles converge there.
     el.dispatchEvent(new CustomEvent("maya:landed", { detail: { x: pos.cx, y: pos.cy } }));
+    // Assemble the interface from a directional particle stream (Increment F).
+    el.classList.add("is-assembling");
+    setTimeout(() => el.classList.remove("is-assembling"), 1400);
+    el.dispatchEvent(new CustomEvent("maya:stream", { detail: { x: pos.cx, y: pos.cy } }));
     return el;
   }
 

@@ -85,6 +85,52 @@ export class VoiceRenderer {
     }
   }
 
+  /** Rotates among cardinal directions so the stream doesn't always
+    come from the same side. */
+  _streamSource(tx, ty) {
+    const edges = [
+      { x: tx, y: 0 },        // top
+      { x: 0, y: ty },        // left
+      { x: tx, y: this.h },   // bottom
+      { x: this.w, y: ty },   // right
+    ];
+    const e = edges[Math.floor(Math.random() * edges.length)];
+    // Jitter the point spread slightly so each burst feels organic.
+    e.x += (Math.random() - 0.5) * this.w * 0.14;
+    e.y += (Math.random() - 0.5) * this.h * 0.14;
+    return e;
+  }
+
+  /**
+   * A directional assembly stream: `count` particles are emitted from a
+   * screen edge and travel toward `(tx, ty)` — the centre of what is being
+   * assembled. They settle into the focus the way dust gathers to form a
+   * form, rather than just dissolving out of a point.
+   */
+  stream(tx, ty, count = 90) {
+    const src = this._streamSource(this.focusX, this.focusY);
+    this.setFocus(tx, ty);
+    for (let i = 0; i < count; i++) {
+      // Random along the source edge so the burst is a band, not a point.
+      const sx = typeof src.x === "number" && Math.abs(src.x - tx) < 4 ? (Math.random() * this.w) : src.x;
+      const sy = typeof src.y === "number" && Math.abs(src.y - ty) < 4 ? (Math.random() * this.h) : src.y;
+      const dist = Math.hypot(tx - sx, ty - sy);
+      const ang = Math.atan2(ty - sy, tx - sx);
+      const spread = (Math.random() - 0.5) * 0.5;
+      const speed = (0.9 + Math.random() * 0.7) * (dist / 900 + 0.6);
+      this.particles.push({
+        x: sx,
+        y: sy,
+        vx: Math.cos(ang + spread) * speed * 3.2,
+        vy: Math.sin(ang + spread) * speed * 3.2,
+        life: 1,
+        decay: 0.22 + Math.random() * 0.28,
+        size: 0.8 + Math.random() * 1.9,
+      });
+      if (this.particles.length > 1200) this.particles.length = 1200;
+    }
+  }
+
   /**
    * A slow breath of particles for a screen change: energy eases up to
    * `level` and back to calm over `ms`, so the particles converge on the
