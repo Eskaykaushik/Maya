@@ -64,6 +64,57 @@ Replaces the single-shot CSS unveil with a directional particle stream and stagg
   - `maya-text-assemble` keyframe for the response text (letter-spacing blur → tight)
 - **Done when:** Interface materializes with visible particle stream from one side; components appear one by one; response text assembles from particles; legacy tools still work; zero console errors; headless visual regression passes.
 
+### 4. Capability runtime (foundation — tool → capability registry) — **active**
+
+Stop building Maya as a hardcoded collection (timer, calculator, notes …). Make Maya a **runtime for capabilities**. Core is only responsible for the loop: *understand intent → find the right capability → execute it → materialize the appropriate UI → manage its lifecycle*. A new capability (e.g. GitHub, MCP tool) must land by **registration alone** — no edits to the core.
+
+Path: `10 built-in tools → 100+ capabilities → external APIs / MCP tools`, with the core architecture held stable. Larger vision: Maya is not an application with hundreds of screens, it is an **intelligent interface runtime** — the UI appears dynamically for the task and disappears when done.
+
+#### The capability manifest — standard contract
+
+Every capability declares the same three halves: **what it does**, **what it needs (input schema)**, **how it executes**, **what UI to materialize**.
+
+```js
+{
+  id: "timer",                        // stable id (backward-compatible with legacy tool names)
+  description: "Set, pause, resume, and cancel timers",
+  match(text) { ... },                // tier-1 offline intent (optional)
+  input: {                            // declared input schema (what it needs)
+    type: "object",
+    properties: {
+      minutes: { type: "number" },
+      seconds: { type: "number" },
+      action:  { type: "string", enum: ["create","pause","resume","cancel"] },
+    },
+  },
+  async execute(params, ctx) {        // run — may call local logic or an API/MCP
+    return { ... };                   // result → drives materialization + spoken reply
+  },
+  materialize: {                      // UI to render — the manifestation
+    // A — schema-driven (validated ui_spec through ui/interfaces.js), dynamic from execute results
+    spec(specCtx) { return UISpec; }
+    // B — legacy direct-DOM tool (returns an element the materializer mounts)
+    element(params, result) { ... }
+  },
+}
+```
+
+Two registries drive the loop:
+- **Capability registry** — `id → manifest`: `register`, `match(text)`, `resolve(intent)`, `execute(id, params, ctx)`, `materialize(...)`.
+- **UI registry** — `component-type → renderer`; makes the ghost vocabulary `primitives.js` pluggable too, so `input · diff` grows to `image · table · chart · canvas` the same way capabilities do.
+
+#### Steps
+
+- **G1 — Contract + registries (foundation, no behavior change).** Introduce the capability registry (evolving `tools/registry.js`) and a UI component registry; keep the legacy `Registry` exporting so nothing breaks mid-refactor.
+- **G2 — Decouple core from tools.** Replace the 7 hardcoded `import "../tools/x.js"` lines in `core/maya.js` (lines 23–29) with a single `import "../capabilities/index.js"` that self-registers every built-in. Core only asks `Capabilities.resolve(intent)` / `materialize(...)` — never imports a concrete tool.
+- **G3 — One dispatch seam.** `core/maya.js` dispatch becomes `resolve → execute → materialize → complete → dissolve`, handling both materialization styles (spec-based and direct-DOM) through one path.
+- **G4 — Migrate the 7 legacy tools to manifests.** Each `tools/*.js` declares `input` + `execute` + materialization, preserving current offline match/summon behavior exactly (regression guard).
+- **G5 — External capability proof (GitHub).** Add `capabilities/github.js` — registered, not core-linked — demonstrating an external capability materializes with zero core edits; models the MCP/external-tool path (`execute` may call an API or an MCP client).
+- **G6 — Backend contract (kaushix-api, separate repo).** Align agent output so `intent.tool_calls` map to capability `id` + arguments validated against that capability's `input` schema. No core change when a capability is added.
+- **G7 — Hardening & regression.** Commit the referenced headless tests (Playwright-core + system Chrome): 7 migrated manifests still materialize; spec validator retrospective; `node --check` all modules; zero console errors; sacred reading-dock / composer / anchor zones respected.
+
+- **Done when:** A brand-new capability (GitHub) registers and materializes with **zero edits** to `core/maya.js`; the 7 legacy tools behave identically through the unified registry; adding a capability requires only a new manifest file + a self-registering import. The core loop is fully registry-driven.
+
 ## Phase 1 — Schema-Driven Generated Interfaces
 
 Moves Maya from `Ask → Tool → Experience` toward `User → Intent → Generated Interface → Tools → Result`. The model never emits code or HTML — it emits a **structured UI specification**; the frontend owns a validated ghost-primitive component library and renders it. Backend tools stay allowlisted with strict schemas.
