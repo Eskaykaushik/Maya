@@ -23,14 +23,12 @@ Maya is live at https://eskaykaushik.github.io/Maya/. The frontend is a zero-bui
 - `core/maya.js` One-Thing wiring: `_showInterface` / `_retargetInterface` (same-type re-target in place, no remount), `_sayResponse` (center bloom → rest-low), strict surface swap, result→response hand-off
 - `core/materializer.js` single fixed centre slot with 1.25s crossfade dissolve / 1.4s unveil; clamps against sacred bottom band and top-left anchor zone
 - On-screen chat thread removed; banner hides after first interaction; anchor dot reveals on first turn
-- `tools/registry.js` offline **summon matcher** loses the tier-2 lottery for "show calc": `show/open/bring up <tool>` and bare `calc` mount the named tool instantly, zero backend calls (mid-session, any history depth)
 
 **Backend (kaushix-api, separate repo):**
 - `POST /api/maya` extended response shape: `{intent, ui_spec?, reply, tool_calls?}` (backward compatible)
 - `schemas.py` Pydantic models; `sessions.py` in-memory session store (TTL 30 min, cap 1000 sessions)
 - `services.py` `describe_screen()` turns `ui_state` into compact system note for follow-ups
 - `agents/maya.py` tool-calling agent targeting `qwen/qwen3.8-27b`
-- `agents/maya.py` PROMPT hardened: summon/open/name verbs emit the tool call **even mid-conversation** — short replies ("Here.") are lead-ins held behind the tool, never a substitute (kaushix-api `61b4869`, Redeployed)
 
 ## Active Plan
 
@@ -52,6 +50,19 @@ Verify the system is solid before adding new capabilities.
 - **Crossfade timing**: 1.25s dissolve / 1.4s unveil feels calm, not sluggish
 - **`node --check`** all ES modules; zero console/HTTP errors on live site
 - **Done when:** All checks pass; no regressions in legacy tool behavior; new `?spec=` route stable
+
+### 3. Particle assembly animation (Increment F) — **done**
+
+Replaces the single-shot CSS unveil with a directional particle stream and staggered component reveal. The interface feels like it is being assembled from particles:
+
+- **`visual/voice-renderer.js`:** Add `stream(fromX, fromY, toX, toY, count)` — emits a directional burst of particles traveling from a source point to the centre slot. Direction rotates so the stream does not always come from the same side.
+- **`core/materializer.js`:** After computing the slot, emit a `maya:stream` event targeting the slot centre. Add an `is-assembling` class to the tool element so children stagger in.
+- **`core/maya.js`:** Listen for `maya:stream` and call `renderer.stream()`. In `_sayResponse()`, trigger the same stream toward the response centre position before the text blooms.
+- **`styles/maya.css`:**
+  - `maya-component-appear` keyframe for staggered child reveal (fade + blur + translateY)
+  - `.maya-tool.is-assembling` rules with per-child `animation-delay` (0.15s increments)
+  - `maya-text-assemble` keyframe for the response text (letter-spacing blur → tight)
+- **Done when:** Interface materializes with visible particle stream from one side; components appear one by one; response text assembles from particles; legacy tools still work; zero console errors; headless visual regression passes.
 
 ## Phase 1 — Schema-Driven Generated Interfaces
 
@@ -160,6 +171,7 @@ Provider-agnostic by design — no provider committed yet.
 - **C — Backend (kaushix-api):** Done (`a7c5935`): schemas + intent/ui_generator + sessions + extended response + SSE stub + `web.search`/`web.facts` tool seam. *Verify: old + new shapes; allowlist rejects unknown spec types.*
 - **D — Document compare E2E:** Ask → interface → files → diff → "liability only" narrows it. *Verify headless (Playwright-core + system Chrome).*
 - **E — Hardening & regression:** 7 legacy tools still materialize; reading-dock/composer zones respected; spec system regression; crossfade timing; `node --check` all modules.
+- **F — Particle assembly animation:** Done: `VoiceRenderer.stream()` directional burst (random edge, rotating direction) settles into the generative screen; interfaces mount with `is-assembling` (staggered `maya-component-appear`, per-child delays) that clears after 1.4s; `_sayResponse` blooms through `maya-text-assemble`. *Verified headless (Playwright-core): `is-assembling` applied then removed; spec children fully visible; `maya-text-assemble` active on `.is-born`; legacy 7 tools intact; sacred zones respected; zero console errors.*
 
 ### Accepted defaults
 
@@ -178,3 +190,16 @@ Composition (multi-spec), more domains, streaming spec generation, React/TS migr
 - The doc-compare proof is **useful and beautiful**, not a demo — and it evolves conversationally.
 - Malformed/unsupported specs degrade to today's behavior; the 7 legacy tools are untouched.
 - Every trace captures `session → intent → ui_spec → tool → result → final ui` (groundwork for later evaluation).
+
+### Future — Pollinations integration (free services)
+
+Planned for future implementation using Pollinations.ai (no API key required):
+
+- pixels.generate_image — text-to-image generation via Pollinations
+- pixels.transform — image-to-image style transfer via Pollinations
+- pixels.sound — audio/sound effect generation via Pollinations
+- canvas primitive — frontend canvas renderer with rect/circle/text/line/path drawing
+- artboard primitive — layered composition of gradients/images/text/shapes with blend modes
+- Additional spec primitives: image, table, list, divider, chart
+
+All Pollinations endpoints are free and require no API key. Supabase Storage can be added later for caching if needed.
