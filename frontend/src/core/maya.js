@@ -441,10 +441,11 @@ export class Maya {
       });
 
       // Increment F — assemble the interface from a directional particle
-      // stream that arrives just as the swelling content clears the centre.
+      // stream that overlaps the children stagger. Fired near-mount so the
+      // arriving wavefront reads as cause→effect with the reveal.
       el.addEventListener("maya:stream", (e) => {
         const { x, y } = e.detail;
-        setTimeout(() => this.renderer.stream(x, y), 480);
+        setTimeout(() => this.renderer.stream(x, y), 80);
       });
 
       // When the tool finishes, dissolve and hand its held reply to the One-Thing screen.
@@ -564,10 +565,11 @@ export class Maya {
     el.textContent = text;
     el.classList.remove("is-dissolving", "is-quiet", "is-born");
     void el.offsetWidth;
+    // Increment F — a directional stream assembles the response; the letters
+    // sharpen as the particles settle into the form.
+    this.renderer.stream(window.innerWidth / 2, window.innerHeight / 2);
     el.classList.add("is-born");
     this.store.update({ reply: text });
-    // Increment F — a directional stream assembles the response into place.
-    this.renderer.stream(window.innerWidth / 2, window.innerHeight / 2);
     this._transitionPulse();
     if (this._responseTimer) clearTimeout(this._responseTimer);
     this._responseTimer = setTimeout(() => {
@@ -588,8 +590,9 @@ export class Maya {
     const cx = window.innerWidth / 2;
     if (this._pulseTimer) clearTimeout(this._pulseTimer);
     this.renderer.setFocus(cx, cy);
-    this.renderer.surge(0.55, 1500);
-    this._pulseTimer = setTimeout(() => this.renderer.burst(cx, cy), 620);
+    // The settling assembly stream already signals the arrive — this is a
+    // soft ambient breath only (no competing mid-response burst).
+    this.renderer.surge(0.42, 1600);
   }
 
   /** Fold whatever response is on screen back into the dark.
@@ -671,6 +674,13 @@ export class Maya {
       const { x, y } = e.detail;
       this.renderer.setFocus(x, y);
       setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
+    });
+
+    // Increment F — generated interfaces assemble from a directional stream
+    // that overlaps the children stagger (same as legacy mounts).
+    handle.el.addEventListener("maya:stream", (e) => {
+      const { x, y } = e.detail;
+      setTimeout(() => this.renderer.stream(x, y), 80);
     });
 
     handle.el.addEventListener("maya:complete", () => this._onInterfaceComplete(spec, reply));

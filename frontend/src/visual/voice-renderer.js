@@ -85,47 +85,49 @@ export class VoiceRenderer {
     }
   }
 
-  /** Rotates among cardinal directions so the stream doesn't always
-    come from the same side. */
+  /** Chooses a screen edge to launch the assembly stream from. */
   _streamSource(tx, ty) {
-    const edges = [
-      { x: tx, y: 0 },        // top
-      { x: 0, y: ty },        // left
-      { x: tx, y: this.h },   // bottom
-      { x: this.w, y: ty },   // right
-    ];
-    const e = edges[Math.floor(Math.random() * edges.length)];
-    // Jitter the point spread slightly so each burst feels organic.
-    e.x += (Math.random() - 0.5) * this.w * 0.14;
-    e.y += (Math.random() - 0.5) * this.h * 0.14;
-    return e;
+    const r = Math.random();
+    // axis = coordinate fixed to the edge wall; `at` = horizontal/vertical
+    // midpoint to cluster the band around.
+    if (r < 0.25) return { axis: "x", value: 0, at: tx };        // top
+    if (r < 0.5)  return { axis: "x", value: this.h, at: tx };   // bottom
+    if (r < 0.75) return { axis: "y", value: 0, at: ty };        // left
+    return         { axis: "y", value: this.w, at: ty };         // right
   }
 
   /**
    * A directional assembly stream: `count` particles are emitted from a
-   * screen edge and travel toward `(tx, ty)` — the centre of what is being
-   * assembled. They settle into the focus the way dust gathers to form a
-   * form, rather than just dissolving out of a point.
+   * screen edge and SETTLE into a soft disc around `(tx, ty)` — the centre
+   * of what is being assembled. Each particle is goal-directed: it eases in,
+   * flashes, and melts in place, so the eye reads "dust gathered to form
+   * a form" instead of a random sparkle flyby.
    */
-  stream(tx, ty, count = 90) {
-    const src = this._streamSource(this.focusX, this.focusY);
+  stream(tx, ty, count = 70) {
+    const s = this._streamSource(tx, ty);
     this.setFocus(tx, ty);
     for (let i = 0; i < count; i++) {
-      // Random along the source edge so the burst is a band, not a point.
-      const sx = typeof src.x === "number" && Math.abs(src.x - tx) < 4 ? (Math.random() * this.w) : src.x;
-      const sy = typeof src.y === "number" && Math.abs(src.y - ty) < 4 ? (Math.random() * this.h) : src.y;
-      const dist = Math.hypot(tx - sx, ty - sy);
-      const ang = Math.atan2(ty - sy, tx - sx);
-      const spread = (Math.random() - 0.5) * 0.5;
-      const speed = (0.9 + Math.random() * 0.7) * (dist / 900 + 0.6);
+      // Cluster the band around the edge midpoint so the stream reads as a
+      // solid ray rather than a full-height wall.
+      const f = (Math.random() - 0.5) * Math.min(this.w, this.h) * 1.05;
+      const sx = s.axis === "y" ? s.value : s.at + f;
+      const sy = s.axis === "x" ? s.value : s.at + f;
+      // Goal: a particle of the form it is building.
+      const ga = Math.random() * Math.PI * 2;
+      const gd = 6 + Math.random() * 54;
       this.particles.push({
         x: sx,
         y: sy,
-        vx: Math.cos(ang + spread) * speed * 3.2,
-        vy: Math.sin(ang + spread) * speed * 3.2,
+        gx: tx + Math.cos(ga) * gd,
+        gy: ty + Math.sin(ga) * gd,
+        vx: 0,
+        vy: 0,
         life: 1,
-        decay: 0.22 + Math.random() * 0.28,
-        size: 0.8 + Math.random() * 1.9,
+        decay: 0.32 + Math.random() * 0.18,
+        size: 0.6 + Math.random() * 1.6,
+        boost: 1,
+        flashFrames: 0,
+        arrJit: Math.random(),
       });
       if (this.particles.length > 1200) this.particles.length = 1200;
     }
@@ -215,10 +217,31 @@ export class VoiceRenderer {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
 
-      p.x += p.vx + (fx - p.x) * 0.02 * this.energy;
-      p.y += p.vy + (fy - p.y) * 0.02 * this.energy;
-      p.vx *= 0.99;
-      p.vy *= 0.99;
+      if (p.gx !== undefined) {
+        // Assembly particles are goal-directed: ease into their spot, then
+        // flash and melt in place — dust gathering into a form.
+        const dx = p.gx - p.x;
+        const dy = p.gy - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 2) {
+          const step = 0.075 + p.arrJit * 0.04; // per-particle arrival jitter
+          p.x += dx * step;
+          p.y += dy * step;
+        } else {
+          p.x = p.gx;
+          p.y = p.gy;
+          p.flashFrames = 4;
+          p.life -= 0.028;   // melt/gather in place
+          p.size *= 0.92;
+        }
+      } else {
+        p.x += p.vx + (fx - p.x) * 0.02 * this.energy;
+        p.y += p.vy + (fy - p.y) * 0.02 * this.energy;
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+      }
+
+      if (p.flashFrames > 0) p.flashFrames--;
       p.life -= p.decay * 0.03;
 
       if (p.life <= 0) {
@@ -226,11 +249,13 @@ export class VoiceRenderer {
         continue;
       }
 
-      const alpha = Math.max(0, p.life) * (0.3 + this.energy * 0.7);
-      const hue = Math.round(200 - this.energy * 120);
-      ctx.fillStyle = `hsla(${hue}, 70%, 70%, ${alpha})`;
+      const flashing = p.flashFrames > 0;
+      // Flash on arrival so assembling particles "click" into place.
+      const alpha = Math.max(0, p.life) * Math.min(1, 0.36 + this.energy * 0.6 + 0.58 * (p.boost || 0)) * (flashing ? 1.4 : 1);
+      const hue = Math.round(200 - this.energy * 120 - 18 * (p.boost || 0));
+      ctx.fillStyle = `hsla(${hue}, 70%, 72%, ${alpha})`;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (0.5 + this.energy), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, p.size * (0.5 + this.energy) * (p.boost ? 1.15 : 1) * (flashing ? 1.45 : 1), 0, Math.PI * 2);
       ctx.fill();
     }
   }

@@ -111,10 +111,14 @@ export class Materializer {
 
     // Tell the world where the screen is so particles converge there.
     el.dispatchEvent(new CustomEvent("maya:landed", { detail: { x: pos.cx, y: pos.cy } }));
-    // Assemble the interface from a directional particle stream (Increment F).
-    el.classList.add("is-assembling");
-    setTimeout(() => el.classList.remove("is-assembling"), 1400);
-    el.dispatchEvent(new CustomEvent("maya:stream", { detail: { x: pos.cx, y: pos.cy } }));
+    // Increment F — generated interfaces assemble from a directional particle
+    // stream: children stagger in while the slot is marked is-assembling.
+    // Legacy tools skip this (they keep their own entrance animation).
+    if (el.querySelector(".ui-stack")) {
+      el.classList.add("is-assembling");
+      setTimeout(() => el.classList.remove("is-assembling"), 1400);
+      el.dispatchEvent(new CustomEvent("maya:stream", { detail: { x: pos.cx, y: pos.cy } }));
+    }
     return el;
   }
 

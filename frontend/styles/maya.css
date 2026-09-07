@@ -143,17 +143,16 @@ body {
 }
 
 /* The response unveils on the generative screen, slow and gradual, its
-   letter-spacing tightening from a scattered blur into the final form. */
+   letter-spacing tightening from a scattered blur into the final form.
+   One single assemble — no competing opacity/blur pass. */
 .maya-transcript.is-born {
   opacity: 1;
-  animation:
-    maya-text-assemble 0.8s cubic-bezier(0.16, 1, 0.3, 1) both,
-    maya-screen-unveil 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: maya-text-assemble 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes maya-text-assemble {
-  0%   { opacity: 0; letter-spacing: 0.4em; filter: blur(8px); }
-  100% { opacity: 1; letter-spacing: 0.05em; filter: blur(0); }
+  0%   { opacity: 0; letter-spacing: 0.4em; filter: blur(8px) brightness(1.6); }
+  100% { opacity: 1; letter-spacing: 0.05em; filter: blur(0) brightness(1); }
 }
 
 /* ---------------------------------------------------------------------------
@@ -396,15 +395,11 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Increment F — particle assembly. While the interface swells in, its
-   children stagger up one by one, as if the particles that streamed in
-   each formed into a component. Default animatable children start inert so
-   the settle rules are the only thing that moves them.
----------------------------------------------------------------------------- */
-.maya-tool.is-assembling {
-  animation-name: none;
-}
-
+   Increment F — particle assembly. The interface swells in while its
+   children stagger up one by one, as if the particles that streamed in each
+   formed into a component. The container keeps its own single unveil (it
+   plays once), so no animation ever restarts when is-assembling clears.
+----------------------------------------------------------------------------- */
 .maya-tool.is-assembling > .ui-stack > * {
   opacity: 0;
   animation-name: maya-component-appear;
