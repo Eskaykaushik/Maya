@@ -3,8 +3,8 @@
  *
  * Wraps the stage element where the generative screen lives. Every response
  * and interface is shown within a fixed canvas — a reserved centre region
- * where the eye expects action. The background chat thread stays dim behind
- * it; the tool owns the stage.
+ * where the eye expects action. The background chat thread recedes fully
+ * behind it while the tool owns the stage.
  *
  * Change is a single orchestrated handoff — never a hard swap, never two
  * screens stacked on one another:
@@ -165,6 +165,17 @@ export class Materializer {
     this._destroyFn = el?._maya?.destroy || null;
     this.stage.appendChild(el);
     this.stage.classList.add("has-tool");
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "tool-close";
+    closeBtn.setAttribute("aria-label", "Close interface");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      el.dispatchEvent(new CustomEvent("maya:close"));
+    });
+    el.appendChild(closeBtn);
 
     // Mark the canvas-slot as active (subtle glow).
     const slot = document.getElementById("maya-canvas-slot");

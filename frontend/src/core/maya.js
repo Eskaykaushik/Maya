@@ -141,14 +141,22 @@ export class Maya {
     });
   }
 
-  /** Dim the chat while a tool owns the canvas. */
+  /** Recede the chat while a tool owns the canvas — interface only. */
   _dimChat() {
-    if (this.chatBgEl) this.chatBgEl.classList.add("is-dimmed");
+    if (this.chatBgEl) {
+      this.chatBgEl.classList.add("is-dimmed");
+      if (this.chatThreadEl) this.chatThreadEl.setAttribute("aria-hidden", "true");
+      this._recedePrompt();
+    }
   }
 
   /** Restore the chat when the tool dissolves. */
   _undimChat() {
-    if (this.chatBgEl) this.chatBgEl.classList.remove("is-dimmed");
+    if (this.chatBgEl) {
+      this.chatBgEl.classList.remove("is-dimmed");
+      if (this.chatThreadEl) this.chatThreadEl.removeAttribute("aria-hidden");
+      this._restorePrompt();
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -191,6 +199,10 @@ export class Maya {
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      if (this.materializer.active) {
+        this._onUserClose();
+        return;
+      }
       if (this.state === "typing") this._dismissComposer();
     });
   }
@@ -242,6 +254,20 @@ export class Maya {
     input.classList.remove("is-visible");
     input.classList.remove("is-morphing");
     input.style.removeProperty("--lift");
+  }
+
+  /** Keep the anchor dot / prompt away while an interface owns the canvas. */
+  _recedePrompt() {
+    const btn = document.querySelector(".chat-collapse");
+    if (!btn || btn.hidden) return;
+    btn.hidden = true;
+    if (this.promptEl) this.promptEl.classList.add("is-hidden");
+  }
+
+  _restorePrompt() {
+    const btn = document.querySelector(".chat-collapse");
+    if (!btn) return;
+    btn.hidden = false;
   }
 
   _rest() {
@@ -427,6 +453,7 @@ export class Maya {
       });
 
       el.addEventListener("maya:complete", () => this._onLegacyComplete(intent.reply));
+      el.addEventListener("maya:close", () => this._onUserClose());
 
       this.materializer.mount(el);
       this._dissolveResponse(true);
@@ -659,6 +686,7 @@ export class Maya {
     });
 
     handle.el.addEventListener("maya:complete", () => this._onInterfaceComplete(spec, reply));
+    handle.el.addEventListener("maya:close", () => this._onUserClose());
 
     this._enter("thinking");
     this.materializer.mount(handle.el);
@@ -756,6 +784,17 @@ export class Maya {
     const reply = this._buildResultReply(spec) || state.reply || leadIn || "There.";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply });
     this._setLastMayaRow(reply);
+    this._rest();
+  }
+
+  /** The user closed the interface — dissolve it, keep the thread quiet. */
+  _onUserClose() {
+    this._cancelCompletion();
+    this.materializer.dismiss();
+    this.interface = null;
+    this.surface = "response";
+    const reply = this.store.get().reply || null;
+    this.store.update({ surface: "response", uiSpec: null, results: null, reply });
     this._rest();
   }
 
