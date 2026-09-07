@@ -9,6 +9,9 @@
  * a tap + a few words. Transcriptions are routed through offline patterns
  * first, then the Groq backend, and the resolved intent to the tool registry
  * + materializer.
+ *
+ * The background chat thread is Maya's persistent conversation surface.
+ * Tools take the fixed canvas at centre; the thread stays dim behind them.
  */
 
 import { Audio } from "./audio.js";
@@ -51,6 +54,10 @@ export class Maya {
     this.inputEl = inputEl;
     this.voiceEl = voiceEl;
 
+    // The background chat thread — Maya's persistent conversation surface.
+    this.chatBgEl = document.getElementById("maya-chat-bg");
+    this.chatThreadEl = document.querySelector(".chat-bg-thread");
+
     this.renderer = null;
     this.materializer = new Materializer(stage);
     this.audio = null;
@@ -76,7 +83,80 @@ export class Maya {
     this.renderer.setState("dormant");
     this.renderer.start();
     this._enter("dormant");
+
+    // Wire materializer ↔ chat-bg focus transitions.
+    this.materializer._onToolActive = () => this._dimChat();
+    this.materializer._onToolInactive = () => this._undimChat();
+
+    // Build the chat thread from any persisted conversation.
+    this._buildChatFromStore();
   }
+
+  /* ------------------------------------------------------------------ *
+   *  Chat background — the persistent conversation surface.
+   * ------------------------------------------------------------------ */
+
+  _buildChatFromStore() {
+    if (!this.chatThreadEl) return;
+    this.chatThreadEl.textContent = "";
+    const convo = this.store.get().conversation || [];
+    for (const turn of convo) {
+      if (!turn || typeof turn.text !== "string" || !turn.text.trim()) continue;
+      this._appendChatRaw(turn.role, turn.text, turn.tool);
+    }
+  }
+
+  /** Append a user or maya row to the background chat thread. */
+  _appendChat(role, text, tool) {
+    if (!this.chatThreadEl || !text) return;
+    this._appendChatRaw(role, text, tool);
+    this._autoScrollChat();
+  }
+
+  _appendChatRaw(role, text, tool) {
+    const li = document.createElement("li");
+    li.className = `chat-row ${role === "user" ? "is-user" : "is-maya"}`;
+
+    const marker = document.createElement("span");
+    marker.className = "chat-marker";
+    marker.textContent = role === "user" ? "you" : "maya";
+
+    const body = document.createElement("span");
+    body.className = "chat-body";
+    body.textContent = text.replace(/\s+/g, " ").trim();
+
+    li.append(marker, body);
+
+    if (tool) {
+      const rune = document.createElement("span");
+      rune.className = "chat-tool";
+      rune.textContent = `⧖ ${tool}`;
+      li.append(rune);
+    }
+
+    this.chatThreadEl.append(li);
+  }
+
+  _autoScrollChat() {
+    if (!this.chatThreadEl) return;
+    requestAnimationFrame(() => {
+      this.chatThreadEl.scrollTop = this.chatThreadEl.scrollHeight;
+    });
+  }
+
+  /** Dim the chat while a tool owns the canvas. */
+  _dimChat() {
+    if (this.chatBgEl) this.chatBgEl.classList.add("is-dimmed");
+  }
+
+  /** Restore the chat when the tool dissolves. */
+  _undimChat() {
+    if (this.chatBgEl) this.chatBgEl.classList.remove("is-dimmed");
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Bind UI — input, voice, anchor, composer.
+   * ------------------------------------------------------------------ */
 
   _bindUI() {
     this.inputEl.addEventListener("keydown", (e) => {
@@ -86,7 +166,6 @@ export class Maya {
       }
     });
 
-    // The lamp's send light — a second, visible path to the same genie.
     const sendBtn = document.getElementById("maya-send");
     if (sendBtn) {
       sendBtn.addEventListener("click", () => {
@@ -100,31 +179,11 @@ export class Maya {
       this._dismissVoice();
     });
 
-    // The top-left anchor — a general-purpose light for future integrations;
-    // for now it reveals a compact chat summary, never the whole thread.
-    this.chatEl.querySelector(".chat-collapse").addEventListener("click", () => this._toggleSummary());
-
-    // A tap on the dark while the summary is open folds it away — captured so
-    // the tap never also summons the composer beneath it.
-    document.addEventListener("pointerdown", (e) => {
-      const panel = this._summaryPanel();
-      if (!panel || panel.hidden) return;
-      const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-summary, .chat-collapse")) return;
-      this._closeSummary();
-      e.stopImmediatePropagation();
-    }, true);
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this._closeSummary();
-    });
-
-    // Tap the dark → the composer blooms directly at the screen's centre.
+    // Tap the dark → the composer blooms.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg")) return;
       if (this.materializer.active) return;
-      // The composer is up — a tap on the dark folds it back into the calm.
       if (this.state === "typing") {
         this._dismissComposer();
         return;
@@ -139,34 +198,26 @@ export class Maya {
     });
   }
 
-  /** The home greeting (banner) belongs to the very first moment only —
-    once the first interaction begins it is gone for the whole session. */
+  /* ------------------------------------------------------------------ *
+   *  Session — first interaction reveals the chat background.
+   * ------------------------------------------------------------------ */
+
   _sessionActive() {
+    if (this._sessionStarted) return;
     this._sessionStarted = true;
     this.promptEl.classList.add("is-hidden");
-    this._revealAnchor();
-  }
-
-  _revealAnchor() {
-    const collapse = this.chatEl.querySelector(".chat-collapse");
-    if (collapse && collapse.hidden) {
-      collapse.hidden = false;
-      collapse.setAttribute("aria-expanded", "false");
-    }
+    if (this.chatBgEl) this.chatBgEl.classList.add("is-visible");
   }
 
   /* ------------------------------------------------------------------ *
-   *  Type — a point of light blooms into the lamp at the screen's centre,
-   *  then the lamp glides down to rest. No keyboard steal.
+   *  Type — the composer blooms at the centre, rests low.
    * ------------------------------------------------------------------ */
 
   _revealInput() {
     const input = this.inputEl;
-    // The home greeting gives way the moment the composer is summoned.
     this.promptEl.classList.add("is-hidden");
     input.classList.add("is-visible");
 
-    // Measure the resting box, then lift it to the screen centre for its birth.
     const rect = input.getBoundingClientRect();
     const restY = rect.top + rect.height / 2;
     const lift = Math.max(0, restY - window.innerHeight / 2);
@@ -196,12 +247,10 @@ export class Maya {
     input.style.removeProperty("--lift");
   }
 
-  /** The resting state — the composer stays present once it has bloomed. */
   _rest() {
     this._enter(this.inputEl.classList.contains("is-visible") ? "typing" : "dormant");
   }
 
-  /** Fold the composer back into the calm — Escape or a tap on the dark. */
   _dismissComposer() {
     if (!this.inputEl.classList.contains("is-visible")) return;
     this.inputEl.value = "";
@@ -210,10 +259,6 @@ export class Maya {
     this._enter("dormant");
   }
 
-  /**
-   * The genie send — the words narrow and are drawn into the lamp, then the
-   * lamp releases them as light and Maya answers.
-   */
   async _captureAndSend(text) {
     if (this._capturing) return;
     this._sessionActive();
@@ -227,7 +272,6 @@ export class Maya {
     input.setAttribute("disabled", "");
     this.sfx.capture();
 
-    // Wait for the lamp to swallow the words.
     await new Promise((r) => setTimeout(r, 560));
 
     input.classList.remove("is-capturing");
@@ -236,18 +280,15 @@ export class Maya {
     this._capturing = false;
     this._rest();
 
-    // The lamp releases the words as light, then Maya materializes an answer.
     this.renderer.burst(cx, cy);
     await this._handleText(text);
   }
 
   /* ------------------------------------------------------------------ *
-   *  Speak — the mic ignites on demand, rings breathe with the voice,
-   *  and silence ends the turn.
+   *  Speak — the mic ignites on demand.
    * ------------------------------------------------------------------ */
 
   async _openVoice() {
-    // Bloom from where the composer rests, so the listen birthed from typing.
     const r = this.inputEl.getBoundingClientRect();
     const pt = {
       x: r.left + r.width / 2,
@@ -322,15 +363,16 @@ export class Maya {
     this.state = state;
     if (this.renderer) this.renderer.setState(RENDER_STATES[state] || state);
     if (this.audio) this.audio.setSpeaking(state === "thinking" || state === "materialized");
-    // The thinking whisper breathes only while Maya is working.
     if (this.whisperEl) this.whisperEl.hidden = state !== "thinking";
   }
+
+  /* ------------------------------------------------------------------ *
+   *  Handle text — intent routing.
+   * ------------------------------------------------------------------ */
 
   async _handleText(text) {
     if (!text) return;
     this._sessionActive();
-    this._closeSummary();
-    this._showTranscript(text);
 
     if (this.state === "voice" || this.state === "speaking" || this.state === "thinking") {
       this._dismissVoice();
@@ -359,7 +401,7 @@ export class Maya {
       const reply = intent.reply || "There.";
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._rest(), 1400);
+      setTimeout(() => this._rest(), 400);
       return;
     }
 
@@ -367,34 +409,26 @@ export class Maya {
       const reply = intent?.reply || "I did not quite catch that. Try again?";
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._rest(), 1400);
+      setTimeout(() => this._rest(), 400);
       return;
     }
 
     const el = Registry.create(intent.experience, intent.params);
     if (el) {
-      // Listen for where the tool lands so particles migrate there.
       el.addEventListener("maya:landed", (e) => {
         const { x, y } = e.detail;
         this.renderer.setFocus(x, y);
-        // Fade particles toward the landing spot, then back to the dark.
         setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
       });
 
-      // Increment F — assemble the interface from a directional particle
-      // stream that overlaps the children stagger. Fired near-mount so the
-      // arriving wavefront reads as cause→effect with the reveal.
       el.addEventListener("maya:stream", (e) => {
         const { x, y } = e.detail;
         setTimeout(() => this.renderer.stream(x, y), 80);
       });
 
-      // When the tool finishes, dissolve and hand its held reply to the One-Thing screen.
       el.addEventListener("maya:complete", () => this._onLegacyComplete(intent.reply));
 
       this.materializer.mount(el);
-      // The interface is the one thing — the user's echo and any held reply
-      // are blanked instantly; nothing is co-visible in the reading dock.
       this._dissolveResponse(true);
       this.surface = "interface";
       this.store.update({ surface: "interface", uiSpec: null, reply: intent.reply || null });
@@ -403,11 +437,10 @@ export class Maya {
       const reply = `I don't know how to reveal "${intent.experience}" yet.`;
       this._say(reply);
       this._commitTurn(text, reply);
-      setTimeout(() => this._rest(), 1400);
+      setTimeout(() => this._rest(), 400);
     }
   }
 
-  /** POST /api/maya to one candidate host with a hard timeout. */
   async _postMaya(base, payload, timeoutMs = 25000) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeoutMs);
@@ -424,7 +457,6 @@ export class Maya {
   }
 
   async _askBackend(text) {
-    // Blank apiUrl still means "backend disabled" — fallbacks never kick in.
     if (!API_URL) return null;
     const snapshot = this.store.snapshot();
     const payload = {
@@ -436,7 +468,6 @@ export class Maya {
       session_id: snapshot.session_id,
       ui_state: snapshot.ui_state,
     };
-    // Primary first, then each fallback, on network error / timeout / non-2xx.
     const candidates = [API_URL, ...(window.MAYA?.fallbackApiUrls || [])].filter(Boolean);
     for (const base of candidates) {
       let data;
@@ -447,7 +478,6 @@ export class Maya {
       } catch {
         continue;
       }
-      // New shape — a schema-driven interface (Phase 1).
       if (data.ui_spec) {
         return {
           experience: (data.intent && data.intent.experience) || "ui",
@@ -455,7 +485,6 @@ export class Maya {
           reply: data.reply,
         };
       }
-      // Old shape — reply-only or a tool call.
       const tc = data.tool_calls?.[0];
       if (!tc) {
         if (data.response) return { _spoke: true, reply: data.response };
@@ -470,6 +499,10 @@ export class Maya {
     return null;
   }
 
+  /* ------------------------------------------------------------------ *
+   *  Transcript — transient user echo at centre (brief, fades).
+   * ------------------------------------------------------------------ */
+
   _showTranscript(text) {
     const el = this.transcriptEl;
     el.textContent = text;
@@ -477,50 +510,36 @@ export class Maya {
     el.style.animation = "none";
     void el.offsetWidth;
     el.style.animation = "";
+    // The echo fades out quickly — the real thread lives in the chat bg.
+    clearTimeout(this._transcriptFade);
+    this._transcriptFade = setTimeout(() => {
+      el.classList.add("is-dissolving");
+      setTimeout(() => { el.textContent = ""; el.classList.remove("is-dissolving"); }, 1250);
+    }, 900);
   }
 
+  /** Maya's words — append to the background chat thread. */
   _say(text) {
     if (!text) return;
-    const el = this.transcriptEl;
-    el.textContent = text;
-    el.classList.remove("is-dissolving", "is-quiet");
+    this._appendChat("maya", text);
     this.store.update({ reply: text });
-    // The reply arrives bright, then settles into a calm & dim hold.
-    setTimeout(() => el.classList.add("is-quiet"), 2200);
   }
 
   /* ------------------------------------------------------------------ *
-   *  One-Thing screen — a response or an interface, never both.
+   *  One-Thing screen — an interface on the fixed canvas, never both.
    * ------------------------------------------------------------------ */
 
-  /** The hand-off response — blooms at centre, rests low & calm. */
   _sayResponse(text) {
     if (!text) return;
-    // While an interface lives, words are held, never shown beside it.
     if (this.surface === "interface") {
       this.store.update({ reply: text });
       return;
     }
-    this._enter("materialized");
-    const el = this.transcriptEl;
-    el.textContent = text;
-    el.classList.remove("is-dissolving", "is-quiet", "is-born");
-    void el.offsetWidth;
-    // Increment F — a directional stream assembles the response; the letters
-    // sharpen as the particles settle into the form.
-    this.renderer.stream(window.innerWidth / 2, window.innerHeight / 2);
-    el.classList.add("is-born");
+    this._appendChat("maya", text);
     this.store.update({ reply: text });
     this._transitionPulse();
-    if (this._responseTimer) clearTimeout(this._responseTimer);
-    this._responseTimer = setTimeout(() => {
-      el.classList.remove("is-born");
-      el.classList.add("is-quiet");
-    }, 1500);
   }
 
-  /** Breathe a slow surge of particles around the generative screen as its
-    content unveils — everything returns to the calm at the centre. */
   _transitionPulse() {
     let cy = window.innerHeight / 2;
     const el = this.interface && this.interface.el;
@@ -531,13 +550,9 @@ export class Maya {
     const cx = window.innerWidth / 2;
     if (this._pulseTimer) clearTimeout(this._pulseTimer);
     this.renderer.setFocus(cx, cy);
-    // The settling assembly stream already signals the arrive — this is a
-    // soft ambient breath only (no competing mid-response burst).
     this.renderer.surge(0.42, 1600);
   }
 
-  /** Fold whatever response is on screen back into the dark.
-    `instant` blanks it the moment a tool/interface claims the screen. */
   _dissolveResponse(instant = false) {
     const el = this.transcriptEl;
     if (!el || !el.textContent) return;
@@ -555,7 +570,6 @@ export class Maya {
     }, 1250);
   }
 
-  /** The lead-in phrase whispers in the thinking breath, not the dock. */
   _whisper(text) {
     const w = this.whisperEl;
     if (!w || !text) return;
@@ -564,7 +578,6 @@ export class Maya {
     w.hidden = false;
   }
 
-  /** Public seam — present a validated UI spec on the One-Thing screen. */
   showSpec(spec, opts = {}) {
     return this._showInterface(spec, opts);
   }
@@ -573,7 +586,6 @@ export class Maya {
     this._sessionActive();
     const state = this.store.get();
 
-    // Follow-up specs re-target the SAME mounted interface — no remount.
     if (this.interface && state.uiSpec && state.uiSpec.type === spec.type) {
       return this._retargetInterface(spec, sources || {});
     }
@@ -583,14 +595,14 @@ export class Maya {
 
     const verdict = validate(spec);
     if (!verdict.ok) {
-      this._sayResponse(reply || "I could not build that interface.");
+      this._say(reply || "I could not build that interface.");
       return null;
     }
 
     const mergedSources = Object.assign({}, sourcesFromSpec(spec), sources || {});
     const handle = render(spec, { sources: mergedSources });
     if (!handle.ok) {
-      this._sayResponse(reply || "I could not build that interface.");
+      this._say(reply || "I could not build that interface.");
       return null;
     }
 
@@ -617,8 +629,6 @@ export class Maya {
       setTimeout(() => this.renderer.setFocus(window.innerWidth / 2, window.innerHeight / 2), 2000);
     });
 
-    // Increment F — generated interfaces assemble from a directional stream
-    // that overlaps the children stagger (same as legacy mounts).
     handle.el.addEventListener("maya:stream", (e) => {
       const { x, y } = e.detail;
       setTimeout(() => this.renderer.stream(x, y), 80);
@@ -626,7 +636,6 @@ export class Maya {
 
     handle.el.addEventListener("maya:complete", () => this._onInterfaceComplete(spec, reply));
 
-    // The interface materializes and the lead-in fades with the whisper.
     this._enter("thinking");
     this.materializer.mount(handle.el);
     this._transitionPulse();
@@ -634,7 +643,6 @@ export class Maya {
     return handle;
   }
 
-  /** Re-target the live interface in place — apply new values and re-run. */
   _retargetInterface(spec, sources) {
     this._cancelCompletion();
     const handle = this.interface;
@@ -659,7 +667,6 @@ export class Maya {
     return handle;
   }
 
-  /** Interface user events → store + tool events. */
   _onUiEvent(name, detail) {
     const spec = this._lastSpec;
     if (!spec || !this.interface) return;
@@ -679,7 +686,6 @@ export class Maya {
         results: this._collectResults(spec),
       });
       EventBus.emit("tool:result", { results: this.store.get().results, action: detail });
-      // Result → response hand-off: the interface yields, its result is spoken.
       this._scheduleCompletion();
     }
   }
@@ -708,17 +714,15 @@ export class Maya {
     return Object.keys(results).length ? results : null;
   }
 
-  /** Legacy tool hand-off — dissolve, then its held reply becomes the one thing. */
   _onLegacyComplete(heldReply) {
     this._cancelCompletion();
     this.materializer.dismiss();
     this.surface = "response";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply: heldReply || null });
-    if (heldReply) this._sayResponse(heldReply);
+    if (heldReply) this._say(heldReply);
     this._rest();
   }
 
-  /** The result hand-off — interface dissolves, its result is the one thing. */
   _onInterfaceComplete(spec, leadIn) {
     this._cancelCompletion();
     this.materializer.dismiss();
@@ -727,7 +731,7 @@ export class Maya {
     this.surface = "response";
     const reply = this._buildResultReply(spec) || state.reply || leadIn || "There.";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply });
-    this._sayResponse(reply);
+    this._say(reply);
     this._rest();
   }
 
@@ -759,98 +763,30 @@ export class Maya {
   }
 
   /* ------------------------------------------------------------------ *
-   *  Turns — kept only in memory (store) for the anchor's summary; the
-   *  main screen reserves itself for the One Thing: latest response or
-   *  interface. The hidden top-left anchor appears with the first turn.
+   *  Turns — committed to store; also appended to the chat bg thread.
    * ------------------------------------------------------------------ */
 
   _commitTurn(userText, replyText, tool) {
-    this._revealAnchor();
     const convo = this.store.get().conversation || [];
     convo.push({ role: "user", text: userText });
-    if (replyText) convo.push({ role: "maya", text: replyText, tool: tool || null });
+    this._appendChat("user", userText);
+    if (replyText) {
+      convo.push({ role: "maya", text: replyText, tool: tool || null });
+      this._appendChat("maya", replyText, tool);
+    }
     this.store.update({ conversation: convo.slice(-40) });
-  }
-
-  /* ------------------------------------------------------------------ *
-   *  The summary — the top-left anchor's one job for now: a compact
-   *  digest of the conversation, never the raw thread. Future
-   *  integrations claim the same anchor.
-   * ------------------------------------------------------------------ */
-
-  _toggleSummary() {
-    const panel = this._summaryPanel();
-    if (!panel) return;
-    const open = panel.hidden;
-    panel.hidden = !open;
-    this._setSummaryAria(!panel.hidden);
-    if (!panel.hidden) this._renderSummary();
-  }
-
-  _closeSummary() {
-    const panel = this._summaryPanel();
-    if (panel && !panel.hidden) {
-      panel.hidden = true;
-      this._setSummaryAria(false);
-    }
-  }
-
-  _summaryPanel() {
-    return document.getElementById("maya-summary");
-  }
-
-  _setSummaryAria(open) {
-    const collapse = this.chatEl.querySelector(".chat-collapse");
-    if (collapse) collapse.setAttribute("aria-expanded", String(open));
-  }
-
-  _renderSummary() {
-    const panel = this._summaryPanel();
-    if (!panel) return;
-    const list = panel.querySelector(".maya-summary-lines");
-    const empty = panel.querySelector(".maya-summary-empty");
-    const convo = this.store.get().conversation || [];
-    list.textContent = "";
-    if (!convo.length) {
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-    const frag = document.createDocumentFragment();
-    for (const turn of convo) {
-      if (!turn || typeof turn.text !== "string" || !turn.text.trim()) continue;
-      const li = document.createElement("li");
-      li.className = `summary-line ${turn.role === "user" ? "line-user" : "line-maya"}`;
-      const marker = document.createElement("span");
-      marker.className = "summary-marker";
-      marker.textContent = turn.role === "user" ? "you" : "maya";
-      const body = document.createElement("span");
-      body.className = "summary-text";
-      let text = turn.text.replace(/\s+/g, " ").trim();
-      if (text.length > 72) text = text.slice(0, 69) + "…";
-      body.textContent = text;
-      li.append(marker, body);
-      if (turn.tool) {
-        const rune = document.createElement("span");
-        rune.className = "summary-tool";
-        rune.textContent = `⧖ ${turn.tool}`;
-        li.append(rune);
-      }
-      frag.append(li);
-    }
-    list.append(frag);
   }
 
   dispose() {
     this._cancelCompletion();
     if (this._responseTimer) clearTimeout(this._responseTimer);
     if (this._pulseTimer) clearTimeout(this._pulseTimer);
+    clearTimeout(this._transcriptFade);
     this.audio?.stop();
     this.renderer?.stop();
   }
 }
 
-/** Pull inline file values out of a spec so render/retarget can load them. */
 function sourcesFromSpec(spec) {
   const sources = {};
   for (const c of spec.components || []) {

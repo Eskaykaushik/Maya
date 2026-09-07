@@ -1,77 +1,71 @@
-/* session/store — the observable screen model, persisted to localStorage.
- * The frontend owns ONE screen: a calm response OR a generated interface —
- * tracked as state (never decoration). Each turn ships a compact ui_state
- * snapshot, so follow-ups resolve against whatever is actually on screen. */
+/**
+ * Local-storage backed conversation store.
+ *
+ * Maya is offline-first — no data leaves the browser unless the user
+ * taps into Groq or an MCP tool explicitly calls fetch. The store
+ * captures a compact trace of the session (intent, surface, UI spec,
+ * component states, results) so a future "session report" layer can
+ * summarise and export it.
+ */
 
-import { EventBus } from "../events/eventbus.js";
+const STORAGE_KEY = "maya_state";
+const SESSION_KEY = "maya_session";
 
-const KEY = "maya:session:v1";
-const MAX_CONVERSATION = 40;
-
-function fresh() {
-  return {
-    sessionId: String(Date.now().toString(36) + Math.random().toString(36).slice(2, 8)),
-    surface: "response", // "response" | "interface" — never both
-    intent: null,
-    uiSpec: null,
-    componentStates: {},
-    results: null,
-    reply: null,
-    conversation: [],
-  };
+function generateId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-let state = fresh();
-
-try {
-  const raw = localStorage.getItem(KEY);
-  if (raw) {
-    const saved = JSON.parse(raw);
-    if (saved && typeof saved.sessionId === "string") {
-      // Reloads keep the thread + sessionId, but never restore a live
-      // interface — the screen re-derives from the next turn.
-      state = Object.assign(fresh(), saved, {
-        surface: "response",
-        uiSpec: null,
-        results: null,
-        reply: null,
-      });
-      state.conversation = (state.conversation || []).slice(-MAX_CONVERSATION);
-    }
-  }
-} catch {
-  /* private browsing / quota — start fresh */
-}
-
-function persist() {
+function loadSessionId() {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    /* quota */
-  }
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  const id = generateId();
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(id)); } catch {}
+  return id;
 }
+
+const DEFAULTS = {
+  session_id: loadSessionId(),
+  conversation: [],
+  surface: "response",
+  intent: null,
+  uiSpec: null,
+  componentStates: {},
+  results: null,
+  reply: null,
+};
 
 export const Store = {
-  get: () => state,
-
-  update(patch) {
-    state = Object.assign({}, state, patch);
-    persist();
-    EventBus.emit("session:update", { surface: state.surface });
+  get() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && typeof saved === "object" && Array.isArray(saved.conversation)) {
+          return { ...DEFAULTS, ...saved };
+        }
+      }
+    } catch {}
+    return { ...DEFAULTS, conversation: [] };
   },
 
-  /** Compact context for follow-ups — ships as ui_state to the backend. */
+  update(patch) {
+    if (!patch || typeof patch !== "object") return;
+    const state = this.get();
+    Object.assign(state, patch);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  },
+
+  reset() {
+    const fresh = { ...DEFAULTS, session_id: generateId() };
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(fresh.session_id)); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); } catch {}
+    return fresh;
+  },
+
+  /** Plain snapshot — no reactivity, no hooks. */
   snapshot() {
-    return {
-      session_id: state.sessionId,
-      ui_state: {
-        surface: state.surface,
-        intent: state.intent,
-        uiSpec: state.uiSpec,
-        componentStates: state.componentStates,
-        results: state.results,
-        reply: state.reply,
-      },
-    };
+    return this.get();
   },
 };

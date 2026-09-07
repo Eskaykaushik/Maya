@@ -2,7 +2,9 @@
  * Materializer — makes intent become visible, and visible become nothing.
  *
  * Wraps the stage element where the generative screen lives. Every response
- * and interface is shown in one fixed place at the true centre of the dark.
+ * and interface is shown within a fixed canvas — a reserved centre region
+ * where the eye expects action. The background chat thread stays dim behind
+ * it; the tool owns the stage.
  *
  * Change is a single orchestrated handoff — never a hard swap, never two
  * screens stacked on one another:
@@ -12,16 +14,11 @@
  *   RISE   — the incoming matter rises from just below the slot and unveils
  *            through dust to its calm position.
  *   SETTLE — the new screen locks in; its children stagger into a form.
- *
- * Because the outgoing screen is gone before the incoming one arrives, the
- * two are never co-visible in the same place — the hand-off reads as one
- * thing dissolving into another, not one thing sitting on top of another.
  */
 
 // Timings (ms)
-const YIELD_MS = 340;      // how long the outgoing screen lingers as it melts
-const DISSOLVE_MS = 1250;  // full dissolve of the outgoing screen
-const UNVEIL_MS = 1400;    // full unveil of the incoming screen
+const YIELD_MS = 340;
+const DISSOLVE_MS = 1250;
 
 export class Materializer {
   constructor(stageEl) {
@@ -29,6 +26,8 @@ export class Materializer {
     this.current = null;
     this._destroyFn = null;
     this._transitioning = false;
+    this._onToolActive = null;
+    this._onToolInactive = null;
   }
 
   get active() {
@@ -44,45 +43,59 @@ export class Materializer {
       if (prev.parentNode === this.stage) prev.remove();
       if (!this.stage.querySelector(".maya-tool")) {
         this.stage.classList.remove("has-tool");
+        if (this._onToolInactive) this._onToolInactive();
       }
     }, DISSOLVE_MS);
 
-    // The incoming screen's unveil must wait until the visitor has visibly
-    // receded far enough to be beside, not on top of, it.
     return YIELD_MS;
   }
 
+  /** Read the fixed canvas-slot bounds so we clamp tools within it. */
+  _canvasBounds() {
+    const slot = document.getElementById("maya-canvas-slot");
+    if (!slot) return null;
+    const r = slot.getBoundingClientRect();
+    if (!r || r.width <= 0) return null;
+    return { left: r.left, top: r.top, width: r.width, height: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+  }
+
   /**
-   * The generative screen — one fixed place, the true centre of the dark.
-   * Left/top are the tool's top-left, so its centre lands mid-screen. The
-   * sacred zones still clamp it: the top-left anchor dot above and the
-   * composer + footer band below.
+   * The generative screen — tools land within the fixed canvas-slot.
+   * The sacred zones (anchor top, composer bottom) clamp vertically;
+   * the canvas-slot bounds clamp horizontally.
    */
   computeSlot(rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const w = (rect && rect.width) || 0;
     const h = (rect && rect.height) || 0;
+    const cb = this._canvasBounds();
 
-    const cy = vh / 2;
+    // Vertical — composer + footer band below, anchor dot above.
+    const safeTop = Math.max(44, this._topAnchor(vh));
     const safeBottom = vh - Math.max(48, this._bottomBand(vh)) - 8;
+    const cy = (safeTop + safeBottom) / 2;
 
-    const x = Math.max(this._anchorClearance(), Math.round(vw / 2 - w / 2));
-    // Clamp vertically to the band above the composer + footer; a screen
-    // taller than the space rides upward rather than spilling into it.
     let y = Math.round(cy - h / 2);
-    if (y + h > safeBottom) y = Math.max(0, safeBottom - h);
+    if (y < safeTop) y = safeTop;
+    if (y + h > safeBottom) y = Math.max(safeTop, safeBottom - h);
 
-    const pos = {
-      x: Math.round(x),
-      y: Math.round(y),
-      cx: Math.round(vw / 2),
-      cy: Math.round(y + h / 2),
-    };
-    return pos;
+    // Horizontal — centre within the canvas-slot, clamped so nothing
+    // spills outside its hairline.
+    let x;
+    if (cb) {
+      const slotCx = cb.cx;
+      x = Math.round(slotCx - w / 2);
+      x = Math.max(Math.round(cb.left), Math.min(x, Math.round(cb.left + cb.width - w)));
+    } else {
+      x = Math.round(vw / 2 - w / 2);
+    }
+    x = Math.max(this._anchorClearance(), x);
+
+    return { x, y, cx: Math.round(x + w / 2), cy: Math.round(y + h / 2) };
   }
 
-  /** How tall the sacred bottom band is — point of the composer, then footer. */
+  /** How tall the sacred bottom band is — composer + footer. */
   _bottomBand(vh) {
     let band = 0;
     for (const sel of ["#maya-input", ".site-footer"]) {
@@ -92,11 +105,18 @@ export class Materializer {
       if (!rect || rect.height <= 0) continue;
       band = Math.max(band, vh - Math.max(0, rect.top));
     }
-    // Never let the band swallow the whole stage.
     return Math.max(48, Math.min(Math.max(band, 48), vh * 0.5));
   }
 
-  /** Left clearance so nothing ever covers the top-left anchor dot. */
+  /** Top sacred zone — clear the anchor dot and the prompt height. */
+  _topAnchor(vh) {
+    const btn = document.querySelector(".chat-collapse");
+    if (!btn || btn.hidden) return 44;
+    const r = btn.getBoundingClientRect();
+    return (r && r.height > 0 ? r.bottom : 32) + 16;
+  }
+
+  /** Left clearance so nothing covers the anchor dot. */
   _anchorClearance() {
     const btn = document.querySelector(".chat-collapse");
     if (!btn || btn.hidden) return 44;
@@ -106,11 +126,8 @@ export class Materializer {
   }
 
   /**
-   * Mount a rendered experience on the stage at the generative screen.
-   *
-   * The hand-off is staged so the outgoing and incoming screens are never
-   * co-visible: the visitor is yielded to a sinking dissolve, then the new
-   * screen rises in beneath it. `crossfade:false` swaps instantly instead.
+   * Mount a rendered experience on the stage within the canvas-slot.
+   * The hand-off is staged: outgoing yields, then incoming rises.
    */
   mount(el, opts = {}) {
     const prev = this.current;
@@ -125,8 +142,6 @@ export class Materializer {
       prev.remove();
     }
 
-    // Hold the slot while the visitor clears, so a fresh mount never lands
-    // on top of a screen that has not yet begun to leave.
     if (delay > 0) {
       this.current = null;
       this._destroyFn = null;
@@ -151,19 +166,21 @@ export class Materializer {
     this.stage.appendChild(el);
     this.stage.classList.add("has-tool");
 
-    // Measure after insertion. offsetWidth/offsetHeight are layout metrics,
-    // unaffected by the emergence animation's scale transform.
+    // Mark the canvas-slot as active (subtle glow).
+    const slot = document.getElementById("maya-canvas-slot");
+    if (slot) slot.classList.add("has-tool");
+
+    // Notify the chat to dim while a tool is live.
+    if (this._onToolActive) this._onToolActive();
+
     const w = el.offsetWidth || 0;
     const h = el.offsetHeight || 0;
     const pos = this.computeSlot({ width: w, height: h });
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
 
-    // Tell the world where the screen is so particles converge there.
     el.dispatchEvent(new CustomEvent("maya:landed", { detail: { x: pos.cx, y: pos.cy } }));
-    // Increment F — generated interfaces assemble from a directional particle
-    // stream: children stagger in while the slot is marked is-assembling.
-    // Legacy tools skip this (they keep their own entrance animation).
+
     if (el.querySelector(".ui-stack")) {
       el.classList.add("is-assembling");
       setTimeout(() => el.classList.remove("is-assembling"), 1400);
@@ -193,6 +210,9 @@ export class Materializer {
       if (el && el.parentNode === this.stage) el.remove();
       if (!this.stage.querySelector(".maya-tool")) {
         this.stage.classList.remove("has-tool");
+        const slot = document.getElementById("maya-canvas-slot");
+        if (slot) slot.classList.remove("has-tool");
+        if (this._onToolInactive) this._onToolInactive();
       }
     };
 

@@ -11,6 +11,12 @@
 <body>
   <canvas id="maya-canvas" aria-hidden="true"></canvas>
 
+  <div id="maya-chat-bg" class="maya-chat-bg">
+    <ul class="chat-bg-thread" aria-label="Conversation"></ul>
+  </div>
+
+  <div id="maya-canvas-slot" class="maya-canvas-slot" aria-hidden="true"></div>
+
   <div id="maya-stage" aria-live="polite"></div>
 
   <div id="maya-prompt" class="maya-prompt">
@@ -27,12 +33,6 @@
 
   <div id="maya-chat" class="maya-chat">
     <button class="chat-collapse" type="button" aria-label="Chat summary" aria-expanded="false" hidden></button>
-  </div>
-
-  <div id="maya-summary" class="maya-summary" hidden>
-    <p class="maya-summary-title">conversation</p>
-    <ul class="maya-summary-lines"></ul>
-    <p class="maya-summary-empty" hidden>No conversation yet.</p>
   </div>
 
   <input id="maya-input" class="maya-input" type="text" autocomplete="off" spellcheck="false"
