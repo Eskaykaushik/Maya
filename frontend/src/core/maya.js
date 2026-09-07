@@ -2,13 +2,13 @@
  * Maya — the orchestrator.
  *
  * Owns the state machine:
- *   DORMANT → PROMPTING → TYPING / SPEAKING → THINKING → MATERIALIZED → DISSOLVING → DORMANT
+ *   DORMANT → TYPING / SPEAKING → THINKING → MATERIALIZED → DISSOLVING → DORMANT
  *
- * Privacy-first by default: the microphone stays off until the user summons
- * the Speak control. Tapping the dark reveals two options — Type and Speak —
- * that unfurl at the touch point, and the chosen interface materializes.
- * Trancriptions are routed through offline patterns first, then the Groq
- * backend, and the resolved intent to the tool registry + materializer.
+ * Privacy-first by default: the microphone stays off until summoned. Tapping
+ * the dark blooms the text composer directly — the whole conversation is just
+ * a tap + a few words. Transcriptions are routed through offline patterns
+ * first, then the Groq backend, and the resolved intent to the tool registry
+ * + materializer.
  */
 
 import { Audio } from "./audio.js";
@@ -32,7 +32,6 @@ const API_URL = window.MAYA?.apiUrl || "";
 
 const RENDER_STATES = {
   dormant: "dormant",
-  prompting: "prompting",
   typing: "dormant",
   voice: "listening",
   speaking: "speaking",
@@ -42,7 +41,7 @@ const RENDER_STATES = {
 };
 
 export class Maya {
-  constructor({ canvas, stage, promptEl, transcriptEl, whisperEl, chatEl, inputEl, chooserEl, voiceEl }) {
+  constructor({ canvas, stage, promptEl, transcriptEl, whisperEl, chatEl, inputEl, voiceEl }) {
     this.canvas = canvas;
     this.stage = stage;
     this.promptEl = promptEl;
@@ -50,7 +49,6 @@ export class Maya {
     this.whisperEl = whisperEl;
     this.chatEl = chatEl;
     this.inputEl = inputEl;
-    this.chooserEl = chooserEl;
     this.voiceEl = voiceEl;
 
     this.renderer = null;
@@ -58,7 +56,6 @@ export class Maya {
     this.audio = null;
     this.state = "dormant";
     this.sfx = new Sfx();
-    this._chooserPoint = null;
     this._capturing = false;
 
     // One-Thing screen — a response or an interface, tracked as state.
@@ -98,8 +95,6 @@ export class Maya {
       });
     }
 
-    this.chooserEl.querySelector(".chooser-type").addEventListener("click", () => this._onChooseBtn("type"));
-    this.chooserEl.querySelector(".chooser-speak").addEventListener("click", () => this._onChooseBtn("speak"));
     this.voiceEl.querySelector(".voice-btn").addEventListener("click", () => {
       this.sfx.dismiss();
       this._dismissVoice();
@@ -110,7 +105,7 @@ export class Maya {
     this.chatEl.querySelector(".chat-collapse").addEventListener("click", () => this._toggleSummary());
 
     // A tap on the dark while the summary is open folds it away — captured so
-    // the tap never also summons the Type / Speak chooser beneath it.
+    // the tap never also summons the composer beneath it.
     document.addEventListener("pointerdown", (e) => {
       const panel = this._summaryPanel();
       if (!panel || panel.hidden) return;
@@ -124,55 +119,24 @@ export class Maya {
       if (e.key === "Escape") this._closeSummary();
     });
 
-    // Tap the dark → summon the Type / Speak chooser at the screen's centre.
+    // Tap the dark → the composer blooms directly at the screen's centre.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .chooser-btn, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat")) return;
       if (this.materializer.active) return;
-      if (this.state === "prompting") {
-        this._dismissChooser();
-        return;
-      }
       // The composer is up — a tap on the dark folds it back into the calm.
       if (this.state === "typing") {
         this._dismissComposer();
         return;
       }
       if (this.state !== "dormant") return;
-      this._openChooser();
+      this._revealInput();
     });
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      if (this.state === "prompting") this._dismissChooser();
-      else if (this.state === "typing") this._dismissComposer();
+      if (this.state === "typing") this._dismissComposer();
     });
-  }
-
-  /* ------------------------------------------------------------------ *
-   *  The chooser — Type / Speak, unfurling out of a point of light.
-   * ------------------------------------------------------------------ */
-
-  _openChooser() {
-    this.promptEl.classList.add("is-hidden");
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight * 0.42; // the command band, clear of the reading dock
-    const pt = { x: cx, y: cy };
-    this._chooserPoint = pt;
-
-    const c = this.chooserEl;
-    c.classList.remove("is-dissolving");
-    c.hidden = false;
-    c.style.left = `${pt.x}px`;
-    c.style.top = `${pt.y}px`;
-    c.classList.remove("is-visible");
-    void c.offsetWidth; // restart the stagger
-    c.classList.add("is-visible");
-
-    this.renderer.setFocus(pt.x, pt.y);
-    this.renderer.burst(pt.x, pt.y);
-    this.sfx.reveal();
-    this._enter("prompting");
   }
 
   /** The home greeting (banner) belongs to the very first moment only —
@@ -191,36 +155,6 @@ export class Maya {
     }
   }
 
-  _dismissChooser(opts = {}) {
-    const c = this.chooserEl;
-    if (c.hidden) {
-      if (!opts.instant) this._enter("dormant");
-      return;
-    }
-    c.classList.remove("is-visible");
-    c.classList.add("is-dissolving");
-    if (opts.sound !== false) this.sfx.dismiss();
-    setTimeout(() => {
-      c.hidden = true;
-      c.classList.remove("is-dissolving");
-      if (this.state === "prompting") {
-        this._enter("dormant");
-        if (!this._sessionStarted && !this.materializer.active) this.promptEl.classList.remove("is-hidden");
-      }
-    }, opts.instant ? 0 : 460);
-  }
-
-  _onChooseBtn(mode) {
-    this.sfx.choose();
-    this._dismissChooser({ sound: false });
-    if (mode === "type") {
-      // The orbs dissolve into the point the box is born from.
-      setTimeout(() => this._revealInput(), 240);
-    } else {
-      setTimeout(() => this._openVoice(), 320);
-    }
-  }
-
   /* ------------------------------------------------------------------ *
    *  Type — a point of light blooms into the lamp at the screen's centre,
    *  then the lamp glides down to rest. No keyboard steal.
@@ -228,6 +162,8 @@ export class Maya {
 
   _revealInput() {
     const input = this.inputEl;
+    // The home greeting gives way the moment the composer is summoned.
+    this.promptEl.classList.add("is-hidden");
     input.classList.add("is-visible");
 
     // Measure the resting box, then lift it to the screen centre for its birth.
@@ -311,7 +247,12 @@ export class Maya {
    * ------------------------------------------------------------------ */
 
   async _openVoice() {
-    const pt = this._chooserPoint || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    // Bloom from where the composer rests, so the listen birthed from typing.
+    const r = this.inputEl.getBoundingClientRect();
+    const pt = {
+      x: r.left + r.width / 2,
+      y: Math.round(r.top + r.height / 2) || window.innerHeight / 2,
+    };
     const v = this.voiceEl;
     v.classList.remove("is-dissolving");
     v.hidden = false;

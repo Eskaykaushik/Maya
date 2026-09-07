@@ -1,8 +1,8 @@
 /**
  * Sfx — the whisper of Maya.
  *
- * Tiny WebAudio orchestrator for the seams between states: the chooser
- * revealing itself, a choice being made, the dark swallowing it again.
+ * Tiny WebAudio orchestrator for the seams between states: the composer
+ * blooming in, a word being captured, the dark swallowing it again.
  * The AudioContext is created lazily inside a user gesture, so no
  * autoplay policy is ever violated.
  */

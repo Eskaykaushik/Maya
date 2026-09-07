@@ -57,7 +57,6 @@ export class VoiceRenderer {
       this.state === "speaking" ? Math.min(1, amplitude * 6)
       : (this.state === "listening" || this.state === "voice") ? Math.min(0.45, amplitude * 9)
       : this.state === "thinking" ? this.energy * 0.3
-      : this.state === "prompting" ? 0.16
       : 0;
     this.targetEnergy = target;
 
@@ -67,7 +66,7 @@ export class VoiceRenderer {
     }
   }
 
-  /** An instant sparkle of light at a point — the chooser announcing itself. */
+  /** An instant sparkle of light at a point — a new surface announcing itself. */
   burst(x, y) {
     for (let i = 0; i < 26; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -183,11 +182,6 @@ export class VoiceRenderer {
   start() {
     const draw = () => {
       this.t++;
-      // Without a mic (privacy-first), the chooser still holds a living halo.
-      if (this.state === "prompting") {
-        this.targetEnergy = 0.16 + Math.sin(this.t * 0.012) * 0.05;
-        this._syncParticles(this.targetEnergy);
-      }
       this.energy += (this.targetEnergy - this.energy) * 0.05;
       this._clear();
       this._drawParticles();

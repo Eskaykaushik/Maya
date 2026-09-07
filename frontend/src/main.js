@@ -25,7 +25,6 @@ const maya = new Maya({
   whisperEl: document.getElementById("maya-whisper"),
   chatEl: document.getElementById("maya-chat"),
   inputEl: document.getElementById("maya-input"),
-  chooserEl: document.getElementById("maya-chooser"),
   voiceEl: document.getElementById("maya-voice"),
 });
 
