@@ -1,8 +1,14 @@
 name: Deploy Maya to GitHub Pages
 
+# A single Pages site serves both "versions" of Maya, built from two branches:
+#   /      → main branch (production)
+#   /dev/  → dev branch (work-in-progress preview)
+# Both are staged from `git archive` so the artifact never depends on which
+# branch triggered the run.
+
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -18,8 +24,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (all branches)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stage production (/)
+        run: |
+          mkdir -p _site
+          git archive --format=tar origin/main frontend | tar -x -C _site --strip-components=1
+
+      - name: Stage dev (/dev)
+        run: |
+          if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+            mkdir -p _site/dev
+            git archive --format=tar origin/dev frontend | tar -x -C _site/dev --strip-components=1
+            ls _site/dev | head -10
+          else
+            echo "no dev branch — omitting /dev"
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -27,7 +50,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend
+          path: _site
 
   deploy:
     needs: build
