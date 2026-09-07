@@ -18,18 +18,11 @@ import { Audio } from "./audio.js";
 import { VoiceRenderer } from "../visual/voice-renderer.js";
 import { Materializer } from "./materializer.js";
 import { Sfx } from "./sfx.js";
-import { Registry } from "../tools/registry.js";
+import { Capabilities } from "../capabilities/index.js";
 import { render } from "../ui/interfaces.js";
 import { validate } from "../ui/spec.js";
 import { Store } from "../session/store.js";
 import { EventBus } from "../events/eventbus.js";
-import "../tools/timer.js";
-import "../tools/calculator.js";
-import "../tools/stopwatch.js";
-import "../tools/notes.js";
-import "../tools/worldclock.js";
-import "../tools/random.js";
-import "../tools/filemaker.js";
 
 const API_URL = window.MAYA?.apiUrl || "";
 
@@ -379,7 +372,7 @@ export class Maya {
     }
 
     // Tier 1 — instant on-device patterns.
-    let intent = Registry.matchIntent(text);
+    let intent = Capabilities.resolve(text);
 
     // Tier 2 — Groq/backend if patterns were inconclusive.
     if (!intent && API_URL) {
@@ -413,7 +406,7 @@ export class Maya {
       return;
     }
 
-    const el = Registry.create(intent.experience, intent.params);
+    const el = Capabilities.materialize(intent.experience, intent.params);
     if (el) {
       el.addEventListener("maya:landed", (e) => {
         const { x, y } = e.detail;
