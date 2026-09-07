@@ -387,7 +387,12 @@ export class Maya {
 
     // Phase 1 — a schema-driven interface: validate → render → mount → wire.
     if (intent && intent.ui_spec) {
-      this._showInterface(intent.ui_spec, { reply: intent.reply });
+      const handle = this._showInterface(intent.ui_spec, { reply: intent.reply });
+      if (!handle) {
+        this._commitTurn(text, "I could not build that interface.");
+        setTimeout(() => this._rest(), 400);
+        return;
+      }
       this._commitTurn(text, intent.reply || "There.", intent.experience || "ui");
       return;
     }
@@ -395,7 +400,6 @@ export class Maya {
     // The backend answered without summoning a tool — show its words.
     if (intent && intent._spoke) {
       const reply = intent.reply || "There.";
-      this._say(reply);
       this._commitTurn(text, reply);
       setTimeout(() => this._rest(), 400);
       return;
@@ -403,7 +407,6 @@ export class Maya {
 
     if (!intent || !intent.experience) {
       const reply = intent?.reply || "I did not quite catch that. Try again?";
-      this._say(reply);
       this._commitTurn(text, reply);
       setTimeout(() => this._rest(), 400);
       return;
@@ -431,7 +434,6 @@ export class Maya {
       this._commitTurn(text, intent.reply || "On it.", intent.experience);
     } else {
       const reply = `I don't know how to reveal "${intent.experience}" yet.`;
-      this._say(reply);
       this._commitTurn(text, reply);
       setTimeout(() => this._rest(), 400);
     }
@@ -521,6 +523,33 @@ export class Maya {
     this.store.update({ reply: text });
   }
 
+  /** Replace the last Maya row's text in place — one bubble per turn, final wins. */
+  _setLastMayaRow(text) {
+    if (!text) return;
+    if (!this.chatThreadEl) {
+      this.store.update({ reply: text });
+      return;
+    }
+    const rows = this.chatThreadEl.querySelectorAll(".chat-row.is-maya");
+    if (!rows.length) {
+      this._appendChat("maya", text);
+      this.store.update({ reply: text });
+      return;
+    }
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    const body = rows[rows.length - 1].querySelector(".chat-body");
+    if (body && body.textContent !== cleaned) body.textContent = cleaned;
+
+    const convo = this.store.get().conversation || [];
+    for (let i = convo.length - 1; i >= 0; i--) {
+      if (convo[i] && convo[i].role === "maya") {
+        convo[i].text = text;
+        break;
+      }
+    }
+    this.store.update({ reply: text, conversation: convo.slice(-40) });
+  }
+
   /* ------------------------------------------------------------------ *
    *  One-Thing screen — an interface on the fixed canvas, never both.
    * ------------------------------------------------------------------ */
@@ -575,7 +604,9 @@ export class Maya {
   }
 
   showSpec(spec, opts = {}) {
-    return this._showInterface(spec, opts);
+    const handle = this._showInterface(spec, opts);
+    if (!handle) this._say(opts.reply || "I could not build that interface.");
+    return handle;
   }
 
   _showInterface(spec, { reply, sources } = {}) {
@@ -590,17 +621,11 @@ export class Maya {
     this._dissolveResponse(true);
 
     const verdict = validate(spec);
-    if (!verdict.ok) {
-      this._say(reply || "I could not build that interface.");
-      return null;
-    }
+    if (!verdict.ok) return null;
 
     const mergedSources = Object.assign({}, sourcesFromSpec(spec), sources || {});
     const handle = render(spec, { sources: mergedSources });
-    if (!handle.ok) {
-      this._say(reply || "I could not build that interface.");
-      return null;
-    }
+    if (!handle.ok) return null;
 
     this.surface = "interface";
     this.interface = handle;
@@ -715,7 +740,7 @@ export class Maya {
     this.materializer.dismiss();
     this.surface = "response";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply: heldReply || null });
-    if (heldReply) this._say(heldReply);
+    if (heldReply) this._setLastMayaRow(heldReply);
     this._rest();
   }
 
@@ -727,7 +752,7 @@ export class Maya {
     this.surface = "response";
     const reply = this._buildResultReply(spec) || state.reply || leadIn || "There.";
     this.store.update({ surface: "response", uiSpec: null, results: null, reply });
-    this._say(reply);
+    this._setLastMayaRow(reply);
     this._rest();
   }
 
