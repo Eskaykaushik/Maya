@@ -68,6 +68,8 @@ export class Maya {
     this._responseTimer = null;
     this._pulseTimer = null;
     this._sessionStarted = false;
+    this._nearBottom = true;
+    this._scrollTimer = null;
 
     this._bindUI();
   }
@@ -84,6 +86,7 @@ export class Maya {
 
     // Build the chat thread from any persisted conversation.
     this._buildChatFromStore();
+    this._bindChatScroll();
   }
 
   /* ------------------------------------------------------------------ *
@@ -97,6 +100,9 @@ export class Maya {
     for (const turn of convo) {
       if (!turn || typeof turn.text !== "string" || !turn.text.trim()) continue;
       this._appendChatRaw(turn.role, turn.text, turn.tool);
+    }
+    if (this.chatThreadEl.scrollHeight > this.chatThreadEl.clientHeight) {
+      this.chatThreadEl.scrollTop = this.chatThreadEl.scrollHeight;
     }
   }
 
@@ -137,8 +143,58 @@ export class Maya {
   _autoScrollChat() {
     if (!this.chatThreadEl) return;
     requestAnimationFrame(() => {
-      this.chatThreadEl.scrollTop = this.chatThreadEl.scrollHeight;
+      if (this._nearBottom) {
+        this.chatThreadEl.scrollTop = this.chatThreadEl.scrollHeight;
+        this._hideNewChat();
+      } else {
+        this._showNewChat();
+      }
     });
+  }
+
+  /** True when the user is reading at the bottom of the thread. */
+  _atBottom() {
+    const t = this.chatThreadEl;
+    if (!t) return true;
+    return t.scrollHeight - t.scrollTop - t.clientHeight < 72;
+  }
+
+  /** Track pinning + reveal the faint scrollbar only while it is moving. */
+  _bindChatScroll() {
+    const t = this.chatThreadEl;
+    if (!t) return;
+    t.addEventListener("scroll", () => {
+      this._nearBottom = this._atBottom();
+      if (this._nearBottom) this._hideNewChat();
+      t.classList.add("is-scrolling");
+      if (this._scrollTimer) clearTimeout(this._scrollTimer);
+      this._scrollTimer = setTimeout(() => t.classList.remove("is-scrolling"), 700);
+    });
+    const btn = document.getElementById("maya-chat-new");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        this._nearBottom = true;
+        t.scrollTo({ top: t.scrollHeight, behavior: "smooth" });
+        this._hideNewChat();
+      });
+    }
+  }
+
+  /** A quiet "↓ New messages" light — only while the chat owns the screen. */
+  _showNewChat() {
+    const btn = document.getElementById("maya-chat-new");
+    if (!btn) return;
+    if (this.chatBgEl && !this.chatBgEl.classList.contains("is-visible")) return;
+    if (this.materializer.active || this.interface) return;
+    btn.classList.remove("is-pop");
+    void btn.offsetWidth;
+    btn.hidden = false;
+    btn.classList.add("is-pop");
+  }
+
+  _hideNewChat() {
+    const btn = document.getElementById("maya-chat-new");
+    if (btn) btn.hidden = true;
   }
 
   /** Recede the chat while a tool owns the canvas — interface only. */
@@ -147,6 +203,7 @@ export class Maya {
       this.chatBgEl.classList.add("is-dimmed");
       if (this.chatThreadEl) this.chatThreadEl.setAttribute("aria-hidden", "true");
       this._recedePrompt();
+      this._hideNewChat();
     }
   }
 
@@ -187,7 +244,7 @@ export class Maya {
     // Tap the dark → the composer blooms.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg, #maya-chat-new")) return;
       if (this.materializer.active) return;
       if (this.state === "typing") {
         this._dismissComposer();
@@ -397,6 +454,9 @@ export class Maya {
     if (!text) return;
     this._sessionActive();
 
+    // The user is actively engaged — follow fresh messages to the bottom.
+    this._nearBottom = true;
+
     if (this.state === "voice" || this.state === "speaking" || this.state === "thinking") {
       this._dismissVoice();
     }
@@ -578,6 +638,7 @@ export class Maya {
       }
     }
     this.store.update({ reply: text, conversation: convo.slice(-40) });
+    this._autoScrollChat();
   }
 
   /* ------------------------------------------------------------------ *
