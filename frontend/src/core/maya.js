@@ -78,6 +78,7 @@ export class Maya {
     this.renderer = new VoiceRenderer(this.canvas);
     this.renderer.setState("dormant");
     this.renderer.start();
+    this._initTheme();
     this._enter("dormant");
 
     // Wire materializer ↔ chat-bg focus transitions.
@@ -87,6 +88,40 @@ export class Maya {
     // Build the chat thread from any persisted conversation.
     this._buildChatFromStore();
     this._bindChatScroll();
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Theme — light / dark, persisted.
+   * ------------------------------------------------------------------ */
+
+  _initTheme() {
+    const btn = document.getElementById("maya-theme");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    let saved = "";
+    try {
+      saved = localStorage.getItem("maya.theme") || "";
+    } catch (e) {
+      saved = "";
+    }
+
+    const apply = (light) => {
+      document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+      try {
+        localStorage.setItem("maya.theme", light ? "light" : "dark");
+      } catch (e) {
+        /* ignore */
+      }
+      if (meta) meta.setAttribute("content", light ? "#f4f5f8" : "#000000");
+      if (this.renderer) this.renderer.setLight(light);
+    };
+
+    apply(saved === "light");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const light = document.documentElement.getAttribute("data-theme") !== "light";
+        apply(light);
+      });
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -247,7 +282,7 @@ export class Maya {
     // Tap the dark → the composer blooms.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg, #maya-chat-new")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg, #maya-chat-new, #maya-theme")) return;
       if (this.materializer.active) return;
       if (this.state === "typing") {
         this._dismissComposer();
