@@ -878,15 +878,15 @@ body {
   transform: translateX(-50%);
   z-index: 4;
   width: var(--maya-chat-w);
-  min-height: 52px;
-  max-height: 184px;
+  min-height: 48px;
+  max-height: 128px;
   resize: none;
   background:
     radial-gradient(120% 220% at 50% 0%, rgba(120, 140, 255, 0.06), rgba(255, 255, 255, 0.008) 55%, rgba(0, 0, 0, 0) 100%),
     rgba(255, 255, 255, 0.015);
   border: 1px solid rgba(150, 165, 255, 0.16);
-  border-radius: 22px;
-  padding: 14px 58px 14px 26px;
+  border-radius: 999px;
+  padding: 12px 60px;
   overflow-y: auto;
   color: rgba(240, 243, 255, 0.95);
   font-family: inherit;
@@ -900,19 +900,10 @@ body {
     0 0 18px rgba(120, 140, 255, 0.06),
     inset 0 0 14px rgba(120, 140, 255, 0.035);
   transition: opacity 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(150, 165, 255, 0.3) transparent;
+  scrollbar-width: none;
 }
 
-.maya-input::-webkit-scrollbar { width: 6px; }
-.maya-input::-webkit-scrollbar-track { background: transparent; }
-.maya-input::-webkit-scrollbar-thumb {
-  background: rgba(150, 165, 255, 0.28);
-  border-radius: 999px;
-}
-.maya-input::-webkit-scrollbar-thumb:hover {
-  background: rgba(180, 195, 255, 0.5);
-}
+.maya-input::-webkit-scrollbar { display: none; }
 
 /* The lamp keeps a quiet light while it waits. */
 .maya-input.is-visible {
@@ -947,14 +938,14 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Send — a quiet send light riding the composer's right shoulder. It appears
-   once the composer is up and rests, and hides while it is born/capturing.
-   Enter is the primary path; this is a visible second affordance.
+   Send and Attach — twin quiet lights riding the composer's shoulders. Send
+   rests on the right; a small "+" attachment light on the left. Both appear
+   with the composer and hide while it is born/capturing. Enter (send) and
+   the file picker (attach) are the primary paths; these are second affordances.
 --------------------------------------------------------------------------- */
-#maya-send {
+#maya-send,
+#maya-add {
   position: fixed;
-  right: calc((100vw - var(--maya-chat-w)) / 2 + 10px);
-  bottom: calc(5% + 61px);
   z-index: 4;
   width: 32px;
   height: 32px;
@@ -973,25 +964,105 @@ body {
   transition: opacity 0.35s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-#maya-send svg {
+#maya-add {
+  left: calc((100vw - var(--maya-chat-w)) / 2 + 10px);
+  bottom: calc(5% + 61px);
+}
+
+#maya-send {
+  right: calc((100vw - var(--maya-chat-w)) / 2 + 10px);
+  bottom: calc(5% + 61px);
+}
+
+#maya-send svg,
+#maya-add svg {
   width: 15px;
   height: 15px;
 }
 
-#maya-input.is-visible:not(.is-morphing):not(.is-capturing) ~ #maya-send {
+#maya-input.is-visible:not(.is-morphing):not(.is-capturing) ~ #maya-send,
+#maya-input.is-visible:not(.is-morphing):not(.is-capturing) ~ #maya-add {
   opacity: 1;
   pointer-events: auto;
 }
 
-#maya-send:hover {
+#maya-send:hover,
+#maya-add:hover {
   border-color: rgba(180, 195, 255, 0.55);
   box-shadow: 0 0 16px rgba(120, 140, 255, 0.35);
   transform: scale(1.06);
 }
 
-#maya-send:focus-visible {
+#maya-send:focus-visible,
+#maya-add:focus-visible {
   outline: 1px solid rgba(180, 195, 255, 0.8);
   outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Attach chip — a quiet monospace pill that drifts up above the composer with
+   the attached file's name, plus a thin ✕ to release it before sending.
+--------------------------------------------------------------------------- */
+.maya-attach-chip {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5% + 106px);
+  transform: translateX(-50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: var(--maya-chat-w);
+  padding: 5px 8px 5px 12px;
+  border: 1px solid rgba(150, 165, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(14, 16, 24, 0.92);
+  color: rgba(175, 190, 255, 0.85);
+  font-family: var(--maya-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.maya-attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.maya-attach-clear {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(205, 215, 255, 0.75);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.maya-attach-clear:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(235, 240, 255, 1);
+}
+
+.maya-attach-chip[hidden] { display: none; }
+
+.maya-attach-file-input {
+  position: fixed;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @keyframes maya-vessel-breathe {
@@ -1678,7 +1749,8 @@ body {
 
 /* Accessibility */
 @media (max-width: 640px) {
-  #maya-send {
+  #maya-send,
+  #maya-add {
     width: 40px;
     height: 40px;
     bottom: calc(5% + 56px);
@@ -1686,8 +1758,12 @@ body {
 
   .maya-input {
     font-size: 16px;
-    min-height: 54px;
-    max-height: 168px;
+    min-height: 52px;
+    max-height: 124px;
+  }
+
+  .maya-attach-chip {
+    bottom: calc(5% + 104px);
   }
 }
 

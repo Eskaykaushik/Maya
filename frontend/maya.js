@@ -70,6 +70,7 @@ export class Maya {
     this._sessionStarted = false;
     this._nearBottom = true;
     this._scrollTimer = null;
+    this._attached = null;
 
     this._bindUI();
   }
@@ -224,7 +225,7 @@ export class Maya {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        const text = this.inputEl.value.trim();
+        const text = this._composeText();
         if (text) this._captureAndSend(text);
       }
     });
@@ -234,9 +235,27 @@ export class Maya {
     const sendBtn = document.getElementById("maya-send");
     if (sendBtn) {
       sendBtn.addEventListener("click", () => {
-        const text = this.inputEl.value.trim();
+        const text = this._composeText();
         if (text) this._captureAndSend(text);
       });
+    }
+
+    const addBtn = document.getElementById("maya-add");
+    const fileInput = document.getElementById("maya-attach-file");
+    const chip = document.getElementById("maya-attach-chip");
+    if (addBtn && fileInput && chip) {
+      addBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+      fileInput.addEventListener("change", () => this._setAttachFromFile(fileInput, chip));
+      const clear = chip.querySelector(".maya-attach-clear");
+      if (clear) {
+        clear.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this._clearAttach();
+        });
+      }
     }
 
     this.voiceEl.querySelector(".voice-btn").addEventListener("click", () => {
@@ -247,7 +266,7 @@ export class Maya {
     // Tap the dark → the composer blooms.
     document.addEventListener("pointerdown", (e) => {
       const t = e.target && typeof e.target.closest === "function" ? e.target : null;
-      if (t && t.closest(".maya-tool, .maya-input, #maya-send, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg, #maya-chat-new")) return;
+      if (t && t.closest(".maya-tool, .maya-input, #maya-send, #maya-add, .maya-attach-chip, .maya-voice, .site-footer, #maya-file, .maya-chat, .maya-chat-bg, #maya-chat-new")) return;
       if (this.materializer.active) return;
       if (this.state === "typing") {
         this._dismissComposer();
@@ -313,7 +332,41 @@ export class Maya {
   _autoGrowInput() {
     const el = this.inputEl;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 184)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }
+
+  _composeText() {
+    let text = (this.inputEl.value || "").trim();
+    const att = this._attached;
+    if (att && att.content) {
+      const head = text ? `${text}\n\n` : "";
+      text = `${head}[attached: ${att.name}]\n${att.content}`;
+    }
+    return text;
+  }
+
+  _setAttachFromFile(fileInput, chip) {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const cap = 64 * 1024;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let content = String(reader.result || "");
+      if (content.length > cap) content = `${content.slice(0, cap)}\n[truncated]`;
+      this._attached = { name: file.name, content };
+      const nameEl = chip.querySelector(".maya-attach-name");
+      if (nameEl) nameEl.textContent = `${file.name}`;
+      chip.hidden = false;
+    };
+    reader.onerror = () => {};
+    reader.readAsText(file);
+    fileInput.value = "";
+  }
+
+  _clearAttach() {
+    this._attached = null;
+    const chip = document.getElementById("maya-attach-chip");
+    if (chip) chip.hidden = true;
   }
 
   _hideInput() {
@@ -345,6 +398,7 @@ export class Maya {
     if (!this.inputEl.classList.contains("is-visible")) return;
     this.inputEl.value = "";
     this._autoGrowInput();
+    this._clearAttach();
     this._hideInput();
     if (!this._sessionStarted) this.promptEl.classList.remove("is-hidden");
     this._enter("dormant");
@@ -369,6 +423,7 @@ export class Maya {
     input.removeAttribute("disabled");
     input.value = "";
     this._autoGrowInput();
+    this._clearAttach();
     this._capturing = false;
     this._rest();
 
