@@ -20,6 +20,7 @@ export class VoiceRenderer {
     this.state = "dormant";
     this.energy = 0;
     this.targetEnergy = 0;
+    this.light = false;
     this.w = 0;
     this.h = 0;
     this.focusX = 0;
@@ -43,6 +44,11 @@ export class VoiceRenderer {
 
   setState(state) {
     this.state = state;
+  }
+
+  /** Adapt the particle palette to the current interface theme. */
+  setLight(light) {
+    this.light = !!light;
   }
 
   /** Shift the particle convergence target to a new point on the canvas. */
@@ -197,7 +203,7 @@ export class VoiceRenderer {
       this.focusX, this.focusY, 320
     );
     const a = 0.05 + this.energy * 0.12;
-    g.addColorStop(0, `rgba(235,235,255,${a})`);
+    g.addColorStop(0, this.light ? `rgba(60, 95, 220, ${a})` : `rgba(235,235,255,${a})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     this.ctx.fillStyle = g;
     this.ctx.fillRect(0, 0, this.w, this.h);
@@ -247,7 +253,8 @@ export class VoiceRenderer {
       // Flash on arrival so assembling particles "click" into place.
       const alpha = Math.max(0, p.life) * Math.min(1, 0.36 + this.energy * 0.6 + 0.58 * (p.boost || 0)) * (flashing ? 1.4 : 1);
       const hue = Math.round(200 - this.energy * 120 - 18 * (p.boost || 0));
-      ctx.fillStyle = `hsla(${hue}, 70%, 72%, ${alpha})`;
+      const light = this.light ? 32 : 72;
+      ctx.fillStyle = `hsla(${hue}, 68%, ${light}%, ${alpha})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size * (0.5 + this.energy) * (p.boost ? 1.15 : 1) * (flashing ? 1.45 : 1), 0, Math.PI * 2);
       ctx.fill();
